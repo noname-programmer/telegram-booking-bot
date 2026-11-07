@@ -196,6 +196,8 @@ Four checks run in GitHub Actions on every commit:
 
 A plain-language walkthrough of the project (in Russian), covering what each file does and how a single button press travels from Telegram to the database: **[docs/LEARN.md](docs/LEARN.md)**.
 
+Working on the project with Claude Code (skills `/new-client`, `/deploy`, `/check`, `/explain`): **[docs/CLAUDE-GUIDE.md](docs/CLAUDE-GUIDE.md)** (in Russian).
+
 ## 🤝 Contributing
 
 Found a bug or have an idea? [Open an issue](https://github.com/noname-programmer/telegram-booking-bot/issues/new/choose). See [CONTRIBUTING.md](CONTRIBUTING.md) for how to make changes, and [CHANGELOG.md](CHANGELOG.md) for the version history.

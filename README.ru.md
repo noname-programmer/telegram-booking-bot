@@ -204,6 +204,8 @@ Dockerfile, docker-compose.yml
 
 Подробный разбор простым языком: что делает каждый файл и как одно нажатие кнопки проходит от Telegram до базы данных. Всё это в **[docs/LEARN.md](docs/LEARN.md)**.
 
+Как работать над проектом вместе с Claude (команды `/new-client`, `/deploy`, `/check`, `/explain`): **[docs/CLAUDE-GUIDE.md](docs/CLAUDE-GUIDE.md)**.
+
 ## 🤝 Участие в проекте
 
 Нашли ошибку или есть идея? Создайте [issue](https://github.com/noname-programmer/telegram-booking-bot/issues/new/choose). Как вносить изменения, описано в [CONTRIBUTING.md](CONTRIBUTING.md), история версий в [CHANGELOG.md](CHANGELOG.md).

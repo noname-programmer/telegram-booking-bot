@@ -7,6 +7,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
+  skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).
 - ESLint with a CI job (`npm run lint`).
 - Issue and pull request templates, `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`, Dependabot.
