@@ -1,6 +1,6 @@
 # Запуск бота в Docker (без Telegram Serverless).
 #   docker compose up -d --build
-FROM node:22-slim
+FROM node:25-slim
 
 WORKDIR /app
 
