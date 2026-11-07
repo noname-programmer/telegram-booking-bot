@@ -92,7 +92,7 @@ export const SCHEDULE = { open: '09:00', close: '18:00', slotMinutes: 30, daysOf
 | | ☁️ Telegram Serverless | 🖥 Свой сервер (Node.js / Docker) |
 |---|---|---|
 | Хостинг | бесплатно, у Telegram | VPS от ~$3–5/мес или любой компьютер 24/7 |
-| Доступность | пока не у всех ботов | везде |
+| Доступность | пока не у всех пользователей | у всех |
 | Как получает сообщения | webhook (платформа) | long polling (`standalone/bot.js`) |
 | База данных | встроенная SQLite | файл SQLite `data/bot.db` |
 
