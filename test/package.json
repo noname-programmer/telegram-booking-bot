@@ -7,7 +7,7 @@
     "one": "node --import ./register.js run.js"
   },
   "devDependencies": {
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.36.0"
   }
 }
