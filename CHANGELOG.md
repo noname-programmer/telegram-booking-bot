@@ -14,6 +14,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Issue and pull request templates, `CONTRIBUTING.md`, `SECURITY.md`, `CODEOWNERS`, Dependabot.
 - `docs/LEARN.md`: a plain-language walkthrough of how the bot works.
 
+### Changed
+- Dependencies: better-sqlite3 13, drizzle-orm 0.45 (`standalone/`, `test/`), globals 17,
+  GitHub Actions `checkout` and `setup-node` v7.
+- `Dockerfile` is now two-stage: better-sqlite3 13 compiles from source, so build tools live only in the
+  first stage and the final image stays slim.
+
 ## [0.3.0] - 2026-11-07
 
 ### Added
