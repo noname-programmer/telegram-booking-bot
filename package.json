@@ -9,7 +9,8 @@
     "status": "tgcloud status",
     "run": "tgcloud run",
     "test": "cd test && npm install --silent && npm test",
-    "migrate": "tgcloud migrate"
+    "migrate": "tgcloud migrate",
+    "start": "cd standalone && npm start"
   },
   "type": "module",
   "description": "Universal Telegram booking bot on Telegram Serverless"

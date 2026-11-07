@@ -5,26 +5,18 @@
 // Message или CallbackQuery — и проверяем, что бот отправил в ответ.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { getTableConfig } from 'drizzle-orm/sqlite-core';
+import * as schema from '../tgcloud/schema.js';
 import { sqlite, calls, failures, BotApiError } from 'sdk';
 import { ADMIN_IDS, BUSINESS, SERVICES, SCHEDULE } from '../tgcloud/lib/config.js';
 import { upcomingDays } from '../tgcloud/lib/time.js';
 import onMessage from '../tgcloud/handlers/message.js';
 import onCallback from '../tgcloud/handlers/callback_query.js';
 
-// Таблицы — те же, что в tgcloud/schema.js (на платформе их создаёт `npx tgcloud migrate`).
-sqlite.exec(`
-  CREATE TABLE bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL, client_name TEXT NOT NULL, phone TEXT NOT NULL,
-    service_id TEXT NOT NULL, date TEXT NOT NULL, time TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active', created_at INTEGER DEFAULT (unixepoch())
-  );
-  CREATE UNIQUE INDEX uidx_bookings_slot ON bookings(date, time) WHERE status = 'active';
-  CREATE TABLE drafts (
-    user_id INTEGER PRIMARY KEY, service_id TEXT NOT NULL,
-    date TEXT NOT NULL, time TEXT NOT NULL, updated_at INTEGER DEFAULT (unixepoch())
-  );
-`);
+// Таблицы берём из standalone/schema.sql — того же файла, что использует запуск без Serverless.
+// (На платформе их создаёт `npx tgcloud migrate` из tgcloud/schema.js; совпадение проверяется ниже.)
+sqlite.exec(readFileSync(new URL('../standalone/schema.sql', import.meta.url), 'utf8'));
 
 const ADMIN = 999;
 const ALICE = 1;
@@ -71,6 +63,21 @@ async function step(name, fn) {
 }
 
 // --- сценарии ---
+
+await step('standalone/schema.sql совпадает с tgcloud/schema.js', async () => {
+  for (const table of Object.values(schema)) {
+    const cfg = getTableConfig(table);
+    const cols = sqlite.prepare(`PRAGMA table_info(${cfg.name})`).all();
+    assert.deepEqual(cols.map((c) => c.name).sort(), cfg.columns.map((c) => c.name).sort(), `колонки ${cfg.name}`);
+    for (const c of cfg.columns) {
+      const db = cols.find((x) => x.name === c.name);
+      assert.equal(Boolean(db.notnull) || Boolean(db.pk), c.notNull || c.primary, `NOT NULL ${cfg.name}.${c.name}`);
+      assert.equal(Boolean(db.pk), c.primary, `PRIMARY KEY ${cfg.name}.${c.name}`);
+    }
+    const idx = sqlite.prepare(`PRAGMA index_list(${cfg.name})`).all().filter((i) => i.origin === 'c').map((i) => i.name);
+    assert.deepEqual(idx.sort(), cfg.indexes.map((i) => i.config.name).sort(), `индексы ${cfg.name}`);
+  }
+});
 
 await step('/start показывает меню без админки для клиента', async () => {
   await msg(ALICE, { text: '/start' });

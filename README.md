@@ -5,12 +5,13 @@
 **Универсальный бот онлайн-записи для любого бизнеса: от барбершопа до клиники**
 
 Клиент записывается в 4 нажатия. Владелец сразу получает уведомление.
-Сервер не нужен: бот работает на [Telegram Serverless](https://core.telegram.org/bots/serverless).
+Работает на [Telegram Serverless](https://core.telegram.org/bots/serverless) **или** на любом сервере с Node.js / Docker: код один и тот же.
 
 [![Tests](https://github.com/noname-programmer/telegram-booking-bot/actions/workflows/test.yml/badge.svg)](https://github.com/noname-programmer/telegram-booking-bot/actions/workflows/test.yml)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
 ![Telegram](https://img.shields.io/badge/Telegram-Serverless-26a5e4?logo=telegram&logoColor=white)
 ![SQLite](https://img.shields.io/badge/DB-SQLite-003b57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **[▶️ Открыть демо: @schedule_mkapp](https://t.me/schedule_mkapp)**
@@ -64,7 +65,7 @@
 ### 🔒 Надёжность
 - **Двойная запись невозможна.** Проверка перед сохранением и уникальный индекс в базе данных на случай одновременных нажатий.
 - **Защита от подделки кнопок.** Клиент не может отменить чужую запись, открыть админку или записаться на прошедшую дату.
-- **Автотесты.** 27 сценариев прогоняются на каждой из 5 конфигураций при каждом коммите (GitHub Actions).
+- **Автотесты.** 28 сценариев на каждой из 5 конфигураций и сквозная проверка запуска без Serverless при каждом коммите (GitHub Actions).
 
 ## ⚙️ Настройка за 2 минуты
 
@@ -84,9 +85,20 @@ export const SCHEDULE = { open: '09:00', close: '18:00', slotMinutes: 30, daysOf
 
 Затем выполни `npx tgcloud push`, и бот обновлён.
 
-## 🚀 Запуск
+## 🚀 Запуск: два способа
 
-Подробная инструкция с нуля: **[ЗАПУСК.md](ЗАПУСК.md)**.
+Код бота (`tgcloud/`) один. Меняется только то, **где** он работает:
+
+| | ☁️ Telegram Serverless | 🖥 Свой сервер (Node.js / Docker) |
+|---|---|---|
+| Хостинг | бесплатно, у Telegram | VPS от ~$3–5/мес или любой компьютер 24/7 |
+| Доступность | пока не у всех ботов | везде |
+| Как получает сообщения | webhook (платформа) | long polling (`standalone/bot.js`) |
+| База данных | встроенная SQLite | файл SQLite `data/bot.db` |
+
+Подробно, по шагам: **[ЗАПУСК.md](ЗАПУСК.md)**.
+
+### ☁️ Вариант А: Telegram Serverless
 
 ```bash
 npm install
@@ -94,6 +106,24 @@ npx tgcloud login      # токен: @BotFather → бот → Serverless → CL
 npx tgcloud push       # загрузить код
 npx tgcloud migrate    # создать таблицы
 ```
+
+### 🖥 Вариант Б: свой сервер или компьютер
+
+```bash
+cd standalone
+cp .env.example .env   # впиши BOT_TOKEN от @BotFather
+npm install
+npm start
+```
+
+или через Docker:
+
+```bash
+cp standalone/.env.example standalone/.env   # впиши BOT_TOKEN
+docker compose up -d --build
+```
+
+`standalone/sdk.js` подменяет платформенный `sdk`: `db` работает через настоящую SQLite и Drizzle ORM, `api` — через Telegram Bot API. Обработчики бота при этом не меняются ни на строчку.
 
 ## 🏗 Архитектура
 
@@ -122,16 +152,23 @@ tgcloud/
    ├─ ui.js                  # тексты и клавиатуры
    └─ time.js                # даты в часовом поясе бизнеса
 examples/                    # готовые настройки для разных видов бизнеса
-test/                        # локальные тесты с эмуляцией платформы
+standalone/                  # запуск без Serverless: Node.js + SQLite + long polling
+├─ bot.js                    # получает обновления и вызывает те же handlers/
+├─ sdk.js                    # замена платформенного sdk (SQLite + Bot API)
+└─ schema.sql                # таблицы (тесты проверяют, что совпадают с schema.js)
+test/                        # тесты сценариев с эмуляцией платформы
+Dockerfile, docker-compose.yml
 ```
 
 ## 🧪 Тесты
 
-У платформы нет локального эмулятора, поэтому в `test/` есть свой: вместо `sdk` подставляется настоящая SQLite (через Drizzle ORM) и поддельный Bot API, который записывает все вызовы.
+Три уровня проверок, все запускаются в GitHub Actions при каждом коммите:
 
-```bash
-npm test
-```
+| Проверка | Что делает | Команда |
+|---|---|---|
+| Сценарии | 28 сценариев × 5 конфигураций; `sdk` заменён на SQLite и поддельный Bot API | `cd test && npm test` |
+| Standalone | запускает настоящий `bot.js` против поддельного сервера Telegram и проходит запись целиком | `cd standalone && npm run smoke` |
+| Docker | собирает образ | `docker build .` |
 
 ```
 ━━━ examples/clinic.js ━━━

@@ -167,3 +167,9 @@ The platform manages the bot's webhook for you, derived from your deployed
 - Run `npm test` after every change. It runs every scenario in `test/run.js` against `config.js` and each
   example config, with a mocked `sdk` (see `test/mock/`, `test/loader.js`). Tests must not depend on concrete
   config values. Add a scenario for every new feature.
+- The same handlers also run WITHOUT Serverless via `standalone/` (Node.js + better-sqlite3 + long polling):
+  `standalone/sdk.js` re-implements `db`/`api` and `standalone/bot.js` dispatches updates to `tgcloud/handlers/`.
+  Therefore handlers must only use `sdk` APIs that `standalone/sdk.js` provides. When you add a handler,
+  register it in `HANDLERS` in `standalone/bot.js`. When you change `tgcloud/schema.js`, update
+  `standalone/schema.sql` too (`npm test` fails if they diverge). `cd standalone && npm run smoke` is the end-to-end check.
+

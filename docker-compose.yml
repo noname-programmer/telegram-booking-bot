@@ -1,0 +1,7 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped        # бот сам поднимется после перезагрузки сервера
+    env_file: standalone/.env
+    volumes:
+      - ./data:/app/data           # база данных хранится на сервере, а не внутри контейнера

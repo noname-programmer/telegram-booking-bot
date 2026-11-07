@@ -1,0 +1,9 @@
+**/node_modules
+**/.env
+data
+standalone/data
+.git
+.tgcloud
+test
+docs
+examples
