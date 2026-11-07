@@ -1,0 +1,10 @@
+{
+  "name": "booking-bot-local-test",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --import ./register.js run.js" },
+  "devDependencies": {
+    "better-sqlite3": "^11.0.0",
+    "drizzle-orm": "^0.36.0"
+  }
+}

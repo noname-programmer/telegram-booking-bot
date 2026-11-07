@@ -7,6 +7,9 @@
   "scripts": {
     "deploy": "tgcloud push",
     "status": "tgcloud status",
-    "run": "tgcloud run"
-  }
+    "run": "tgcloud run",
+    "test": "cd test && npm install --silent && npm test",
+    "migrate": "tgcloud migrate"
+  },
+  "type": "module"
 }
