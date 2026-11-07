@@ -3,13 +3,15 @@
   "private": true,
   "type": "module",
   "description": "Запуск бота на обычном Node.js (без Telegram Serverless): компьютер, VPS, Docker",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env --import ./register.js bot.js",
     "smoke": "node smoke-test.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
-    "drizzle-orm": "^0.36.0"
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.4"
   }
 }
