@@ -1,0 +1,20 @@
+name: 💡 Feature request
+description: Suggest an idea or a new kind of business to support
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      placeholder: "Clinics need separate schedules for each doctor …"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: How do you imagine it?
+  - type: input
+    id: business
+    attributes:
+      label: Type of business
+      placeholder: "dental clinic, car wash, tutor …"

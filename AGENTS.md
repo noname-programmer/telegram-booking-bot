@@ -164,6 +164,9 @@ The platform manages the bot's webhook for you, derived from your deployed
 - Dates are stored as `'YYYY-MM-DD'` text and times as `'HH:MM'` in the business timezone (`SCHEDULE.utcOffsetHours`).
 - The platform has no cron, so reminders are sent manually from the admin panel.
 - All user-facing text is Russian and uses `parse_mode: 'HTML'`. Escape user data with `esc()`.
+- Run `npm run lint` (ESLint, root) and `npm test` after every change. Keep `CHANGELOG.md` (Unreleased) updated.
+- Docs: `README.md` is English, `README.ru.md` is Russian; keep both in sync. `docs/LEARN.md` explains the code
+  to a non-programmer owner and quotes real code: update it when the quoted code changes.
 - Run `npm test` after every change. It runs every scenario in `test/run.js` against `config.js` and each
   example config, with a mocked `sdk` (see `test/mock/`, `test/loader.js`). Tests must not depend on concrete
   config values. Add a scenario for every new feature.
