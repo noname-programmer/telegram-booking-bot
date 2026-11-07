@@ -1,17 +1,29 @@
 {
   "name": "telegram-booking-bot",
-  "private": true,
-  "devDependencies": {
-    "@tgcloud/cli": "^0.2.0"
+  "version": "0.3.0",
+  "description": "Universal Telegram booking bot: runs on Telegram Serverless or any Node.js/Docker server",
+  "author": "Nizomiddin Nazarov",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noname-programmer/telegram-booking-bot.git"
   },
+  "private": true,
+  "type": "module",
   "scripts": {
     "deploy": "tgcloud push",
     "status": "tgcloud status",
     "run": "tgcloud run",
     "test": "cd test && npm install --silent && npm test",
     "migrate": "tgcloud migrate",
-    "start": "cd standalone && npm start"
+    "start": "cd standalone && npm start",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
-  "type": "module",
-  "description": "Universal Telegram booking bot on Telegram Serverless"
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@tgcloud/cli": "^0.2.0",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0"
+  }
 }

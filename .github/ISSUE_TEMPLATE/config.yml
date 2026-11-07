@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔒 Security issue
+    url: https://github.com/noname-programmer/telegram-booking-bot/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue.
+  - name: ▶️ Live demo
+    url: https://t.me/schedule_mkapp
+    about: Try the bot in Telegram before opening an issue.

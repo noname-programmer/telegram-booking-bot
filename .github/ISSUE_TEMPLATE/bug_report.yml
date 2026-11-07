@@ -1,0 +1,34 @@
+name: 🐞 Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, and what did the bot answer?
+      placeholder: "1. Pressed «Записаться» 2. Chose a service 3. The bot replied …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Where does the bot run?
+      options:
+        - Telegram Serverless
+        - Node.js (standalone)
+        - Docker
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove tokens and customers' phone numbers before posting.
+      render: text

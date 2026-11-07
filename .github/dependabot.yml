@@ -1,0 +1,18 @@
+# Dependabot opens pull requests when dependencies have updates or security fixes.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: monthly }
+  - package-ecosystem: npm
+    directory: /test
+    schedule: { interval: monthly }
+  - package-ecosystem: npm
+    directory: /standalone
+    schedule: { interval: monthly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: monthly }
