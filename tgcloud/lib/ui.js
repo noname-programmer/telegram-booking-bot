@@ -14,14 +14,16 @@
 //   adm:remind:<YYYYMMDD>     — разослать напоминания на день
 
 import { api, BotApiError } from 'sdk';
-import { BUSINESS, SERVICES, CURRENCY, ADMIN_IDS } from './config.js';
+import { BUSINESS, SERVICES, CURRENCY, ADMIN_IDS, TEXTS } from './config.js';
 import { prettyDate, packDate, packTime } from './time.js';
 import { findService } from './bookings.js';
 
 export const isAdmin = (userId) => ADMIN_IDS.includes(userId);
 
 // 120000 → '120 000 сум'. Без toLocaleString: в облачной песочнице может не быть локалей.
-export const money = (n) => `${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${CURRENCY}`;
+// Неразрывные пробелы (\u00a0), чтобы Telegram не переносил число посередине.
+const NBSP = '\u00a0';
+export const money = (n) => `${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP)}${NBSP}${CURRENCY}`;
 
 // Экранирование для parse_mode: 'HTML' — чтобы имя клиента вида "<b>" не сломало разметку.
 export const esc = (s) => String(s)
@@ -37,9 +39,22 @@ function rows(buttons, perRow) {
   return out;
 }
 
+// Цена для показа: число → '100 000 сум', 0 → 'бесплатно', null → '' (не показывать).
+export function priceLabel(price) {
+  if (price === null || price === undefined) return '';
+  return price === 0 ? 'бесплатно' : money(price);
+}
+
 export function serviceLine(serviceId) {
   const s = findService(serviceId);
-  return s ? `${s.title} — ${money(s.price)}` : serviceId;
+  if (!s) return serviceId;
+  const price = priceLabel(s.price);
+  return price ? `${s.title} — ${price}` : s.title;
+}
+
+// Блок «что, когда» — повторяется в подтверждении, уведомлениях и напоминаниях.
+export function summary(serviceId, date, time) {
+  return `${TEXTS.icon} ${esc(serviceLine(serviceId))}\n📅 ${prettyDate(date)} в <b>${time}</b>`;
 }
 
 export function bookingLine(b, { withClient = false } = {}) {
@@ -58,15 +73,18 @@ export function mainMenu(userId) {
   ];
   if (isAdmin(userId)) keyboard.push([btn('🛠 Админка', 'adm')]);
   return {
-    text: `Здравствуйте! Это бот <b>${esc(BUSINESS.name)}</b>.\n\nЗдесь можно записаться за 30 секунд — без звонков.`,
+    text: `Здравствуйте! Это бот <b>${esc(BUSINESS.name)}</b>.\n\n${esc(TEXTS.welcome)}`,
     reply_markup: { inline_keyboard: keyboard },
   };
 }
 
 export function servicesScreen() {
-  const keyboard = SERVICES.map((s) => [btn(`${s.title} · ${money(s.price)}`, `svc:${s.id}`)]);
+  const keyboard = SERVICES.map((s) => {
+    const price = priceLabel(s.price);
+    return [btn(price ? `${s.title} · ${price}` : s.title, `svc:${s.id}`)];
+  });
   keyboard.push(backTo('menu'));
-  return { text: '✂️ Выберите услугу:', reply_markup: { inline_keyboard: keyboard } };
+  return { text: `${TEXTS.icon} ${esc(TEXTS.chooseService)}`, reply_markup: { inline_keyboard: keyboard } };
 }
 
 export function daysScreen(serviceId, freeByDay) {

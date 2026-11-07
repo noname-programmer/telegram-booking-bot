@@ -2,8 +2,9 @@
 // Формат callback_data описан в начале lib/ui.js.
 
 import { api } from 'sdk';
+import { TEXTS } from '../lib/config.js';
 import {
-  upcomingDays, prettyDate, unpackDate, unpackTime,
+  upcomingDays, unpackDate, unpackTime,
 } from '../lib/time.js';
 import {
   findService, freeSlotsForDays, isSlotFree, saveDraft, getBooking, cancelBooking,
@@ -12,7 +13,7 @@ import {
 import {
   show, mainMenu, servicesScreen, daysScreen, timesScreen, myBookingsScreen, infoScreen,
   adminDaysScreen, adminDayScreen, askContactKeyboard, notifyAdmins, isAdmin,
-  serviceLine, esc,
+  summary, esc,
 } from '../lib/ui.js';
 
 export default async function (query) {
@@ -87,13 +88,13 @@ async function onTime(chatId, messageId, userId, [serviceId, packedDate, packedT
   await saveDraft(userId, serviceId, date, time);
 
   await show(chatId, {
-    text: `✂️ ${esc(serviceLine(serviceId))}\n📅 ${prettyDate(date)} в <b>${time}</b>`,
+    text: summary(serviceId, date, time),
     reply_markup: { inline_keyboard: [] },
   }, messageId);
 
   await api.sendMessage({
     chat_id: chatId,
-    text: 'Остался последний шаг: нажмите кнопку <b>«📱 Отправить номер»</b> внизу экрана, чтобы мастер мог с вами связаться.\n\nМожно и просто написать номер сообщением.',
+    text: `Остался последний шаг: нажмите кнопку <b>«📱 Отправить номер»</b> внизу экрана, ${esc(TEXTS.contactReason)}.\n\nМожно и просто написать номер сообщением.`,
     parse_mode: 'HTML',
     reply_markup: askContactKeyboard,
   });
@@ -110,7 +111,7 @@ async function onClientCancel(chatId, messageId, userId, bookingId) {
   await cancelBooking(b.id);
   await show(chatId, myBookingsScreen(await userUpcoming(userId)), messageId);
   await notifyAdmins(
-    `🚫 <b>Клиент отменил запись</b>\n\n✂️ ${esc(serviceLine(b.serviceId))}\n📅 ${prettyDate(b.date)} в <b>${b.time}</b>\n👤 ${esc(b.clientName)} · 📞 ${esc(b.phone)}`,
+    `🚫 <b>Клиент отменил запись</b>\n\n${summary(b.serviceId, b.date, b.time)}\n👤 ${esc(b.clientName)} · 📞 ${esc(b.phone)}`,
   );
   return 'Запись отменена';
 }
@@ -138,7 +139,7 @@ async function onAdmin(chatId, messageId, [sub, arg]) {
     try {
       await api.sendMessage({
         chat_id: b.userId,
-        text: `😔 К сожалению, ваша запись отменена администратором:\n\n✂️ ${esc(serviceLine(b.serviceId))}\n📅 ${prettyDate(b.date)} в <b>${b.time}</b>\n\nВыберите другое время: /start`,
+        text: `😔 К сожалению, ваша запись отменена администратором:\n\n${summary(b.serviceId, b.date, b.time)}\n\nВыберите другое время: /start`,
         parse_mode: 'HTML',
       });
     } catch (e) {
@@ -156,7 +157,7 @@ async function onAdmin(chatId, messageId, [sub, arg]) {
       try {
         await api.sendMessage({
           chat_id: b.userId,
-          text: `⏰ <b>Напоминаем о записи</b>\n\n✂️ ${esc(serviceLine(b.serviceId))}\n📅 ${prettyDate(b.date)} в <b>${b.time}</b>\n\nЕсли планы изменились — отмените запись в разделе «📋 Мои записи».`,
+          text: `⏰ <b>Напоминаем о записи</b>\n\n${summary(b.serviceId, b.date, b.time)}\n\nЕсли планы изменились — отмените запись в разделе «📋 Мои записи».`,
           parse_mode: 'HTML',
         });
         sent++;

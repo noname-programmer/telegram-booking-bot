@@ -1,0 +1,22 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: test/package-lock.json
+      - name: Install test dependencies
+        working-directory: test
+        run: npm ci
+      - name: Run scenarios on all configs
+        working-directory: test
+        run: npm test

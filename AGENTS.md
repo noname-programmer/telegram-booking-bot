@@ -153,13 +153,17 @@ The platform manages the bot's webhook for you, derived from your deployed
 `setWebhook` with the raw bot token — `npx tgcloud webhook` shows the mismatch and
 `npx tgcloud webhook sync` repairs it.
 
-## This project: booking bot (project-specific notes)
+## This project: universal booking bot (project-specific notes)
 
-- Business settings (services, prices, hours, admins) live ONLY in `tgcloud/lib/config.js`.
+- The bot is business-agnostic. Business settings (name, services, prices, hours, admins, wording in `TEXTS`)
+  live ONLY in `tgcloud/lib/config.js`. Never hard-code business-specific words in handlers or ui.js.
+- `examples/*.js` are ready configs for different businesses; keep them in the same shape as `config.js`.
+- `price`: number → formatted sum, `0` → «бесплатно», `null` → hidden.
 - DB access goes through `tgcloud/lib/bookings.js`; texts/keyboards through `tgcloud/lib/ui.js`.
   Handlers stay thin. The callback_data format is documented at the top of `lib/ui.js` (64-byte limit).
 - Dates are stored as `'YYYY-MM-DD'` text and times as `'HH:MM'` in the business timezone (`SCHEDULE.utcOffsetHours`).
 - The platform has no cron, so reminders are sent manually from the admin panel.
 - All user-facing text is Russian and uses `parse_mode: 'HTML'`. Escape user data with `esc()`.
-- Run `npm test` after every change. It runs the handlers locally against a mocked `sdk`
-  (see `test/mock/`). Add a scenario to `test/run.js` for every new feature.
+- Run `npm test` after every change. It runs every scenario in `test/run.js` against `config.js` and each
+  example config, with a mocked `sdk` (see `test/mock/`, `test/loader.js`). Tests must not depend on concrete
+  config values. Add a scenario for every new feature.

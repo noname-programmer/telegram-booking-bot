@@ -1,14 +1,14 @@
 // handlers/message.js — обычные сообщения: команды, телефон клиента, кнопка «Отменить».
 
 import { api } from 'sdk';
-import { SERVICES } from '../lib/config.js';
-import { upcomingDays, prettyDate } from '../lib/time.js';
+import { SERVICES, TEXTS } from '../lib/config.js';
+import { upcomingDays } from '../lib/time.js';
 import {
   getDraft, deleteDraft, createBooking, freeSlotsForDays, countByDay,
 } from '../lib/bookings.js';
 import {
   show, mainMenu, adminDaysScreen, timesScreen, notifyAdmins, isAdmin,
-  removeKeyboard, serviceLine, esc,
+  removeKeyboard, summary, esc,
 } from '../lib/ui.js';
 
 // Похоже ли на номер телефона (если клиент ввёл его руками, а не кнопкой).
@@ -99,20 +99,18 @@ async function finishBooking(message, phone, clientName) {
 
   await deleteDraft(userId);
 
-  const summary =
-    `✂️ ${esc(serviceLine(booking.serviceId))}\n` +
-    `📅 ${prettyDate(booking.date)} в <b>${booking.time}</b>`;
+  const what = summary(booking.serviceId, booking.date, booking.time);
 
   await api.sendMessage({
     chat_id: chatId,
-    text: `✅ <b>Вы записаны!</b>\n\n${summary}\n\nЖдём вас! Отменить запись можно в разделе «📋 Мои записи».`,
+    text: `✅ <b>Вы записаны!</b>\n\n${what}\n\n${esc(TEXTS.booked)} Отменить запись можно в разделе «📋 Мои записи».`,
     parse_mode: 'HTML',
     reply_markup: removeKeyboard,
   });
   await show(chatId, mainMenu(userId));
 
   await notifyAdmins(
-    `🆕 <b>Новая запись</b>\n\n${summary}\n👤 ${esc(booking.clientName)}\n📞 ${esc(booking.phone)}`,
+    `🆕 <b>Новая запись</b>\n\n${what}\n👤 ${esc(booking.clientName)}\n📞 ${esc(booking.phone)}`,
     { inline_keyboard: [[{ text: '❌ Отменить запись', callback_data: `adm:cancel:${booking.id}` }]] },
   );
 }

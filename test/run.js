@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { sqlite, calls, failures, BotApiError } from 'sdk';
-import { ADMIN_IDS } from '../tgcloud/lib/config.js';
+import { ADMIN_IDS, BUSINESS, SERVICES, SCHEDULE } from '../tgcloud/lib/config.js';
 import { upcomingDays } from '../tgcloud/lib/time.js';
 import onMessage from '../tgcloud/handlers/message.js';
 import onCallback from '../tgcloud/handlers/callback_query.js';
@@ -31,8 +31,17 @@ const ALICE = 1;
 const BOB = 2;
 ADMIN_IDS.push(ADMIN);
 
-const DAY = upcomingDays()[1]; // завтра — все слоты гарантированно в будущем
+const DAY = upcomingDays()[1]; // следующий рабочий день — все слоты гарантированно в будущем
 const PACKED = DAY.replaceAll('-', '');
+const S1 = SERVICES[0].id;
+const S2 = SERVICES[1].id;
+// Все слоты дня по настройкам: ['10:00', '11:00', ...]
+const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const SLOTS = [];
+for (let m = toMin(SCHEDULE.open); m <= toMin(SCHEDULE.close) - SCHEDULE.slotMinutes; m += SCHEDULE.slotMinutes) SLOTS.push(fmt(m));
+const P = (t) => t.replace(':', '');
+console.log(`Конфигурация: ${BUSINESS.name} · услуг: ${SERVICES.length} · слотов в день: ${SLOTS.length}\n`);
 
 // --- помощники ---
 const user = (id) => ({ id, first_name: `User${id}`, is_bot: false });
@@ -66,7 +75,7 @@ async function step(name, fn) {
 await step('/start показывает меню без админки для клиента', async () => {
   await msg(ALICE, { text: '/start' });
   const [m] = sent(take(), 'sendMessage');
-  assert.match(m.params.text, /Ustara/);
+  assert.ok(m.params.text.includes(BUSINESS.name));
   assert.deepEqual(buttons(m), ['book', 'my', 'info']);
 });
 
@@ -84,28 +93,34 @@ await step('Записаться → список услуг (редактиру
   await press(ALICE, 'book');
   const out = take();
   const [e] = sent(out, 'editMessageText');
-  assert.deepEqual(buttons(e), ['svc:cut', 'svc:beard', 'svc:combo', 'svc:kids', 'menu']);
-  assert.match(e.params.text + JSON.stringify(e.params.reply_markup), /80 000 сум/);
+  assert.deepEqual(buttons(e), [...SERVICES.map((x) => `svc:${x.id}`), 'menu']);
+  const labels = e.params.reply_markup.inline_keyboard.flat().map((b) => b.text);
+  SERVICES.forEach((x, i) => {
+    assert.ok(labels[i].startsWith(x.title));
+    if (x.price === 0) assert.match(labels[i], /бесплатно/);
+    if (x.price === null) assert.equal(labels[i], x.title);
+    if (x.price > 0) assert.match(labels[i], /\d{1,3}(\u00a0\d{3})*\u00a0сум/);
+  });
   assert.equal(sent(out, 'answerCallbackQuery').length, 1);
 });
 
 await step('Услуга → список дней', async () => {
-  await press(ALICE, 'svc:cut');
+  await press(ALICE, `svc:${S1}`);
   const [e] = sent(take(), 'editMessageText');
-  assert.ok(buttons(e).includes(`day:cut:${PACKED}`));
+  assert.ok(buttons(e).includes(`day:${S1}:${PACKED}`));
 });
 
-await step('День → слоты 10:00…20:00 (11 штук)', async () => {
-  await press(ALICE, `day:cut:${PACKED}`);
+await step('День → все слоты дня по расписанию', async () => {
+  await press(ALICE, `day:${S1}:${PACKED}`);
   const [e] = sent(take(), 'editMessageText');
   const times = buttons(e).filter((d) => d.startsWith('time:'));
-  assert.equal(times.length, 11);
-  assert.equal(times[0], `time:cut:${PACKED}:1000`);
-  assert.equal(times.at(-1), `time:cut:${PACKED}:2000`);
+  assert.equal(times.length, SLOTS.length);
+  assert.equal(times[0], `time:${S1}:${PACKED}:${P(SLOTS[0])}`);
+  assert.equal(times.at(-1), `time:${S1}:${PACKED}:${P(SLOTS.at(-1))}`);
 });
 
 await step('Время → просьба отправить номер', async () => {
-  await press(ALICE, `time:cut:${PACKED}:1000`);
+  await press(ALICE, `time:${S1}:${PACKED}:${P(SLOTS[0])}`);
   const out = take();
   const m = sent(out, 'sendMessage')[0];
   assert.equal(m.params.reply_markup.keyboard[0][0].request_contact, true);
@@ -121,28 +136,28 @@ await step('Контакт → запись создана, клиенту по�
   assert.match(toAdmin[0].params.text, /Новая запись[\s\S]*Алиса[\s\S]*\+998901112233/);
   assert.deepEqual(buttons(toAdmin[0]), ['adm:cancel:1']);
   const row = sqlite.prepare('SELECT * FROM bookings').get();
-  assert.equal(row.time, '10:00');
+  assert.equal(row.time, SLOTS[0]);
   assert.equal(sqlite.prepare('SELECT count(*) c FROM drafts').get().c, 0);
 });
 
 await step('Занятое время пропадает из списка', async () => {
-  await press(BOB, `day:cut:${PACKED}`);
+  await press(BOB, `day:${S1}:${PACKED}`);
   const times = buttons(sent(take(), 'editMessageText')[0]);
-  assert.ok(!times.includes(`time:cut:${PACKED}:1000`));
-  assert.ok(times.includes(`time:cut:${PACKED}:1100`));
+  assert.ok(!times.includes(`time:${S1}:${PACKED}:${P(SLOTS[0])}`));
+  assert.ok(times.includes(`time:${S1}:${PACKED}:${P(SLOTS[1])}`));
 });
 
 await step('Нажатие на уже занятое время (старая кнопка) → отказ', async () => {
-  await press(BOB, `time:cut:${PACKED}:1000`);
+  await press(BOB, `time:${S1}:${PACKED}:${P(SLOTS[0])}`);
   assert.match(toast(take()), /занято/);
 });
 
 await step('Гонка: время заняли, пока клиент отправлял номер', async () => {
-  await press(BOB, `time:cut:${PACKED}:1100`);
+  await press(BOB, `time:${S1}:${PACKED}:${P(SLOTS[1])}`);
   take();
-  // Кто-то другой успел занять 11:00 напрямую.
+  // Кто-то другой успел занять этот слот напрямую.
   sqlite.prepare(`INSERT INTO bookings (user_id, client_name, phone, service_id, date, time)
-                  VALUES (3, 'X', '1', 'cut', ?, '11:00')`).run(DAY);
+                  VALUES (3, 'X', '1', ?, ?, ?)`).run(S1, DAY, SLOTS[1]);
   await msg(BOB, { contact: { phone_number: '+998900000000', first_name: 'Боб' } });
   const out = take();
   assert.match(sent(out, 'sendMessage')[0].params.text, /только что заняли/);
@@ -150,7 +165,7 @@ await step('Гонка: время заняли, пока клиент отпр�
 });
 
 await step('Номер, введённый текстом, тоже принимается', async () => {
-  await press(BOB, `time:beard:${PACKED}:1200`);
+  await press(BOB, `time:${S2}:${PACKED}:${P(SLOTS[2])}`);
   take();
   await msg(BOB, { text: '+998 90 000 00 00' });
   const out = sent(take(), 'sendMessage');
@@ -163,7 +178,7 @@ await step('Произвольный текст без черновика → м
 });
 
 await step('Кнопка «❌ Отменить» на шаге телефона удаляет черновик', async () => {
-  await press(ALICE, `time:cut:${PACKED}:1500`);
+  await press(ALICE, `time:${S1}:${PACKED}:${P(SLOTS[5])}`);
   take();
   await msg(ALICE, { text: '❌ Отменить' });
   take();
@@ -173,7 +188,7 @@ await step('Кнопка «❌ Отменить» на шаге телефона
 await step('Мои записи → список с кнопкой отмены', async () => {
   await press(ALICE, 'my');
   const e = sent(take(), 'editMessageText')[0];
-  assert.match(e.params.text, /10:00/);
+  assert.ok(e.params.text.includes(SLOTS[0]));
   assert.ok(buttons(e).includes('cancel:1'));
 });
 
@@ -192,7 +207,7 @@ await step('Клиент отменяет свою запись → админ �
 });
 
 await step('После отмены время снова свободно и на него можно записаться', async () => {
-  await press(BOB, `time:cut:${PACKED}:1000`);
+  await press(BOB, `time:${S1}:${PACKED}:${P(SLOTS[0])}`);
   take();
   await msg(BOB, { contact: { phone_number: '+998900000000', first_name: 'Боб' } });
   assert.match(sent(take(), 'sendMessage')[0].params.text, /Вы записаны/);
@@ -207,13 +222,13 @@ await step('Админка: дни со счётчиками записей', as
   await press(ADMIN, 'adm');
   const e = sent(take(), 'editMessageText')[0];
   const day = e.params.reply_markup.inline_keyboard.flat().find((b) => b.callback_data === `adm:day:${PACKED}`);
-  assert.match(day.text, /\(3\)/); // X 11:00, Боб 12:00, Боб 10:00
+  assert.match(day.text, /\(3\)/); // X (слот 2), Боб (слот 3), Боб (слот 1)
 });
 
 await step('Админка: записи дня с телефонами', async () => {
   await press(ADMIN, `adm:day:${PACKED}`);
   const e = sent(take(), 'editMessageText')[0];
-  assert.match(e.params.text, /10:00[\s\S]*11:00[\s\S]*12:00/);
+  assert.ok(new RegExp(SLOTS.slice(0, 3).join('[\\s\\S]*')).test(e.params.text));
   assert.match(e.params.text, /\+998900000000/);
 });
 
@@ -225,7 +240,7 @@ await step('Админ: разослать напоминания', async () => 
 });
 
 await step('Админ отменяет запись → клиенту сообщение', async () => {
-  const id = sqlite.prepare("SELECT id FROM bookings WHERE time = '12:00' AND status = 'active'").get().id;
+  const id = sqlite.prepare("SELECT id FROM bookings WHERE time = ? AND status = 'active'").get(SLOTS[2]).id;
   await press(ADMIN, `adm:cancel:${id}`);
   const out = take();
   assert.match(sent(out, 'sendMessage').find((c) => c.params.chat_id === BOB).params.text, /отменена администратором/);
@@ -250,7 +265,7 @@ await step('Старое сообщение нельзя отредактиро�
 });
 
 await step('Подделанные кнопки не роняют бота', async () => {
-  for (const data of ['svc:hack', 'day:cut:19990101', 'time:cut:19990101:1000', 'time:cut', 'cancel:abc', 'zzz', '']) {
+  for (const data of ['svc:hack', `day:${S1}:19990101`, `time:${S1}:19990101:1000`, `time:${S1}`, 'cancel:abc', 'zzz', '']) {
     await press(ALICE, data);
   }
   assert.equal(sent(take(), 'answerCallbackQuery').length, 7);
