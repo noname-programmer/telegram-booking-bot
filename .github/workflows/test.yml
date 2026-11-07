@@ -5,7 +5,8 @@ on:
   pull_request:
 
 jobs:
-  test:
+  scenarios:
+    name: Scenarios (all configs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,9 +15,29 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: test/package-lock.json
-      - name: Install test dependencies
-        working-directory: test
+      - working-directory: test
         run: npm ci
-      - name: Run scenarios on all configs
-        working-directory: test
+      - working-directory: test
         run: npm test
+
+  standalone:
+    name: Standalone (Node.js + SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: standalone/package-lock.json
+      - working-directory: standalone
+        run: npm ci
+      - working-directory: standalone
+        run: npm run smoke
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t telegram-booking-bot .
