@@ -12,6 +12,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Russian / Uzbek / English. Scenarios in `test/keeper.js`.
   Deployed to @keepXsavebot; a long edited message no longer exceeds Telegram's 4096-character limit, and a repeated
   "deleted" event no longer notifies twice.
+- Keeper Mini App rebuilt: chats grouped by person, a feed, insights (14-day and hour-of-day charts, deletion speed,
+  top chats), profile with settings, and an admin panel for `ADMIN_IDS` (numbers and users only, gift or remove Pro).
+- Keeper: quiet mode and per-chat mute (events are collected in the Mini App without messages in the chat);
+  more data per message (sender, file size and duration, forward origin, edit history with times); `chats` table
+  with lifetime counters.
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).

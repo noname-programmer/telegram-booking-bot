@@ -18,6 +18,10 @@ import onBizEdited from '../keeper/tgcloud/handlers/edited_business_message.js';
 import onBizDeleted from '../keeper/tgcloud/handlers/deleted_business_messages.js';
 import feedEndpoint from '../keeper/tgcloud/endpoints/feed.js';
 import sendMediaEndpoint from '../keeper/tgcloud/endpoints/sendMedia.js';
+import chatsEndpoint from '../keeper/tgcloud/endpoints/chats.js';
+import statsEndpoint from '../keeper/tgcloud/endpoints/stats.js';
+import settingsEndpoint from '../keeper/tgcloud/endpoints/settings.js';
+import adminEndpoint from '../keeper/tgcloud/endpoints/admin.js';
 
 // Создаём таблицы прямо из keeper/tgcloud/schema.js (на платформе это делает `npx tgcloud migrate`).
 for (const t of Object.values(schema)) {
@@ -182,7 +186,104 @@ await step('Мини-приложение без Pro: не больше лими
   assert.equal(data.connected, true);
   assert.ok(data.items.length >= 2 && data.items.length <= LIMITS.freeFeed);
   const edited = await feedEndpoint({ type: 'edited' }, ctx(OWNER));
-  assert.deepEqual(edited.items[0].versions, ['приду в 5']);
+  assert.deepEqual(edited.items[0].versions.map((v) => v.text), ['приду в 5']);
+});
+
+await step('Мини-приложение: список собеседников со счётчиками', async () => {
+  const data = await chatsEndpoint({}, ctx(OWNER));
+  assert.equal(data.chats.length, 1);
+  const chat = data.chats[0];
+  assert.equal(chat.chatId, FRIEND);
+  assert.equal(chat.name, 'Friend');
+  assert.ok(chat.saved >= 4 && chat.deleted >= 2 && chat.edited >= 1);
+  assert.ok(chat.eventAt > 0);
+  assert.equal((await chatsEndpoint({}, ctx(OTHER))).chats.length, 0); // чужих чатов не видно
+});
+
+await step('Мини-приложение: лента одного собеседника, общая лента без повторов', async () => {
+  const one = await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OWNER));
+  assert.ok(one.items.length >= 3);
+  assert.equal(new Set(one.items.map((i) => i.id)).size, one.items.length);
+  assert.ok(one.items.every((i) => i.chatId === FRIEND && i.date > 0 && (i.deletedAt || i.editedAt)));
+  assert.equal((await feedEndpoint({ type: 'all', chatId: 12345 }, ctx(OWNER))).items.length, 0);
+});
+
+await step('Подробности сообщения сохраняются: размер, длительность, пересылка, отправитель', async () => {
+  const m = biz({ voice: { file_id: 'v-meta', duration: 7, file_size: 2048, mime_type: 'audio/ogg' },
+    forward_origin: { type: 'user', sender_user: { first_name: 'Вася' } }, reply_to_message: { message_id: 1, text: 'моё' } });
+  m.from.username = 'friend_nick';
+  await onBizMessage(m);
+  await del([m.message_id]);
+  take();
+  const { items } = await feedEndpoint({ type: 'deleted', chatId: FRIEND }, ctx(OWNER));
+  const item = items.find((i) => i.kind === 'voice');
+  assert.deepEqual(item.meta, { size: 2048, duration: 7, mime: 'audio/ogg', forward: 'Вася', reply: true });
+  assert.equal(item.username, 'friend_nick');
+  assert.equal(item.fromId, FRIEND);
+  assert.doesNotMatch(JSON.stringify(item), /моё/); // текст, на который ответили, не храним
+  sqlite.prepare('delete from messages where message_id = ?').run(m.message_id);
+});
+
+await step('Тихий режим и «без уведомлений» по чату: в чат не пишем, в истории всё есть', async () => {
+  const quiet = async (text) => {
+    const m = biz({ text });
+    await onBizMessage(m);
+    await onBizEdited({ ...m, text: `${text}!` });
+    await del([m.message_id]);
+    return m;
+  };
+  assert.equal((await settingsEndpoint({ notify: false }, ctx(OWNER))).notify, false);
+  await quiet('тихо');
+  assert.equal(take().length, 0);
+  await settingsEndpoint({ notify: true }, ctx(OWNER));
+  await settingsEndpoint({ mute: { chatId: FRIEND, muted: true } }, ctx(OWNER));
+  const m = await quiet('без звука');
+  assert.equal(take().length, 0);
+  assert.equal((await chatsEndpoint({}, ctx(OWNER))).chats[0].muted, true);
+  await settingsEndpoint({ mute: { chatId: FRIEND, muted: false } }, ctx(OWNER));
+  const { items } = await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OWNER));
+  assert.ok(items.some((i) => i.text === 'без звука!' && i.deletedAt && i.editedAt));
+  sqlite.prepare("delete from edits where msg_id in (select id from messages where text in ('тихо!', 'без звука!'))").run();
+  sqlite.prepare("delete from messages where text in ('тихо!', 'без звука!')").run();
+  assert.ok(m);
+});
+
+await step('Кнопка «Уведомления» в меню бота переключает режим', async () => {
+  await press(OWNER, 'notify');
+  assert.match(texts(take()), /Тихий режим/);
+  await press(OWNER, 'notify');
+  assert.match(texts(take()), /Уведомления приходят/);
+});
+
+await step('Аналитика: итоги, дни, часы, виды, скорость удаления', async () => {
+  const data = await statsEndpoint({ tz: 300 }, ctx(OWNER));
+  assert.equal(data.totals.chats, 1);
+  assert.ok(data.totals.deleted >= 2 && data.totals.edited >= 1);
+  assert.equal(data.days.length, 14);
+  assert.equal(data.hours.length, 24);
+  assert.equal(data.days.at(-1).deleted, data.hours.reduce((a, b) => a + b, 0)); // всё удалено сегодня
+  assert.ok(data.kinds.text >= 1 && data.kinds.photo >= 1);
+  assert.ok(data.life.count >= 2 && data.top[0].name === 'Friend');
+  assert.equal((await statsEndpoint({}, ctx(OTHER))).totals.deleted, 0);
+});
+
+await step('Админ-панель: только для админа, без текстов сообщений; подарить и снять Pro', async () => {
+  await assert.rejects(() => adminEndpoint({}, ctx(OWNER)));
+  const admin = ctx(ADMIN_IDS[0]);
+  const data = await adminEndpoint({}, admin);
+  assert.equal(data.admin, true);
+  assert.ok(data.totals.users >= 3 && data.totals.conns === 1 && data.totals.deleted >= 2);
+  const owner = data.users.find((u) => u.id === OWNER);
+  assert.equal(owner.name, `User${OWNER}`);
+  assert.equal(owner.connected, true);
+  assert.ok(owner.chats === 1 && owner.deleted >= 2);
+  assert.doesNotMatch(JSON.stringify(data), /приду в|смотри|удали/);
+  const gift = await adminEndpoint({ action: 'pro', userId: OTHER, days: 30 }, admin);
+  assert.equal(gift.users.find((u) => u.id === OTHER).pro, true);
+  const off = await adminEndpoint({ action: 'pro', userId: OTHER, days: 0 }, admin);
+  assert.equal(off.users.find((u) => u.id === OTHER).pro, false);
+  await assert.rejects(() => adminEndpoint({ action: 'pro', userId: 424242, days: 30 }, admin));
+  await assert.rejects(() => adminEndpoint({ action: 'pro', userId: OTHER, days: 30 }, ctx(OTHER)));
 });
 
 await step('Чужую историю в мини-приложении не видно', async () => {
@@ -287,6 +388,8 @@ await step('«Удалить всё» → подтверждение → дан�
   assert.match(texts(take()), /Удалить все/);
   await press(OWNER, 'wipe:yes');
   assert.equal(sqlite.prepare('select count(*) as n from messages where owner_id = ?').get(OWNER).n, 0);
+  assert.equal((await chatsEndpoint({}, ctx(OWNER))).chats.length, 0);
+  await settingsEndpoint({ wipe: true }, ctx(OWNER)); // то же из мини-приложения — не падает на пустой базе
 });
 
 await step('/stats — только для владельца бота', async () => {

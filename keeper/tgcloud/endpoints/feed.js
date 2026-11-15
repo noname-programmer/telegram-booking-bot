@@ -1,25 +1,16 @@
-// endpoints/feed.js — список удалённых или изменённых сообщений для мини-приложения.
-// Вызов из мини-приложения: Telegram.WebApp.Serverless.call('feed', { type: 'deleted' }, ...)
+// endpoints/feed.js — лента удалённых и изменённых сообщений для мини-приложения.
+// Вызов: Telegram.WebApp.Serverless.call('feed', { type: 'all', chatId: 123 }, ...)
+//   type:   'deleted' | 'edited' | 'all' (по умолчанию 'deleted')
+//   chatId: показать только одного собеседника (не обязательно)
 
-import { LIMITS } from '../lib/config.js';
-import { getUser, isPro, feed, hasActiveConnection } from '../lib/store.js';
+import { feed } from '../lib/store.js';
+import { whoami, toItem } from '../lib/app.js';
 
 export default async function (input, ctx) {
-  const user = await getUser(ctx.initData.user); // пользователь проверен платформой
-  const pro = isPro(user);
-  const type = input.type === 'edited' ? 'edited' : 'deleted';
-  const rows = await feed(user.id, type, pro ? LIMITS.proFeed : LIMITS.freeFeed);
-  return {
-    lang: user.lang,
-    pro,
-    proUntil: user.proUntil,
-    connected: await hasActiveConnection(user.id),
-    limit: pro ? LIMITS.proFeed : LIMITS.freeFeed,
-    items: rows.map((r) => ({
-      id: r.id, name: r.fromName, kind: r.kind, text: r.text, date: r.date,
-      at: type === 'edited' ? r.editedAt : r.deletedAt,
-      hasFile: Boolean(r.fileId),
-      versions: r.versions,
-    })),
-  };
+  const { user, limit, profile } = await whoami(ctx);
+  const type = ['edited', 'all'].includes(input.type) ? input.type : 'deleted';
+  const chatId = Number.isFinite(Number(input.chatId)) && input.chatId !== null && input.chatId !== undefined
+    ? Number(input.chatId) : null;
+  const rows = await feed(user.id, { type, chatId, limit });
+  return { ...profile, items: rows.map(toItem) };
 }

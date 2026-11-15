@@ -1,6 +1,6 @@
 // lib/ui.js — тексты, кнопки и отправка уведомлений.
 // Формат callback_data (данные кнопки, до 64 байт):
-//   menu | pro | lang | lang:<код> | privacy | wipe:ask | wipe:yes | wipe:no
+//   pro | lang | lang:<код> | notify | privacy | wipe:ask | wipe:yes | wipe:no
 
 import { api, BotApiError } from 'sdk';
 import { BOT_NAME, MINIAPP_URL, PRO, LIMITS } from './config.js';
@@ -36,10 +36,12 @@ export async function menu(user, username) {
     '',
     t(lang, (await hasActiveConnection(user.id)) ? 'statusOn' : 'statusOff'),
     isPro(user) ? t(lang, 'planPro', { date: fmtDate(user.proUntil) }) : t(lang, 'planFree', { days: LIMITS.freeDays }),
+    t(lang, user.notify ? 'notifyOn' : 'notifyOff'),
   ];
   const rows = [];
   if (MINIAPP_URL) rows.push([{ text: t(lang, 'btnHistory'), web_app: { url: MINIAPP_URL } }]);
   rows.push([{ text: t(lang, 'btnPro'), callback_data: 'pro' }, { text: t(lang, 'btnLang'), callback_data: 'lang' }]);
+  rows.push([{ text: t(lang, user.notify ? 'btnNotifyOn' : 'btnNotifyOff'), callback_data: 'notify' }]);
   rows.push([{ text: t(lang, 'btnPrivacy'), callback_data: 'privacy' }]);
   return { text: lines.join('\n'), reply_markup: { inline_keyboard: rows } };
 }

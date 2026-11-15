@@ -2,148 +2,852 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Keeper</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   /* Цвета берём из темы Telegram пользователя (светлая или тёмная). */
   :root {
-    --bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
-    --card: var(--tg-theme-bg-color, #fff);
-    --text: var(--tg-theme-text-color, #111);
-    --hint: var(--tg-theme-hint-color, #8a8a8f);
-    --accent: var(--tg-theme-button-color, #2481cc);
+    --bg: var(--tg-theme-secondary-bg-color, #eff0f4);
+    --card: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #fff));
+    --text: var(--tg-theme-text-color, #0f1115);
+    --hint: var(--tg-theme-hint-color, #8b8f99);
+    --accent: var(--tg-theme-button-color, #2f7cf6);
     --accent-text: var(--tg-theme-button-text-color, #fff);
+    --link: var(--tg-theme-link-color, #2f7cf6);
+    --line: rgba(128, 132, 145, .18);
+    --soft: rgba(128, 132, 145, .12);
+    --red: #e5484d;
+    --amber: #f08c00;
+    --green: #2fb36a;
+    --violet: #7c5cff;
+    --radius: 18px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; padding: 12px 16px 32px; background: var(--bg); color: var(--text);
-         font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
-  .tabs { display: flex; gap: 6px; background: var(--card); padding: 4px; border-radius: 12px; margin-bottom: 12px; }
-  .tabs button { flex: 1; border: 0; background: none; color: var(--hint); padding: 9px 4px; border-radius: 9px;
-                 font: inherit; font-weight: 600; }
-  .tabs button.on { background: var(--accent); color: var(--accent-text); }
-  .card { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; }
-  .head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-  .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .time { color: var(--hint); font-size: 13px; white-space: nowrap; }
-  .kind { color: var(--hint); font-size: 13px; }
-  .text { white-space: pre-wrap; overflow-wrap: anywhere; }
-  .old { color: var(--hint); text-decoration: line-through; white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 4px; }
-  .file { margin-top: 8px; border: 0; border-radius: 9px; padding: 7px 12px; font: inherit; font-size: 14px;
-          background: var(--accent); color: var(--accent-text); }
-  .note { color: var(--hint); text-align: center; padding: 28px 12px; }
-  .banner { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); padding: 0 14px calc(92px + var(--safe-b));
+         font: 15px/1.42 -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+         -webkit-font-smoothing: antialiased; overflow-wrap: anywhere; }
+  button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+  svg { display: block; }
+
+  /* ---------- шапка ---------- */
+  .top { display: flex; align-items: center; gap: 12px; padding: 16px 4px 12px; }
+  .logo { width: 42px; height: 42px; border-radius: 14px; flex: none; display: grid; place-items: center; color: #fff;
+          background: linear-gradient(135deg, #7c5cff, #2f7cf6 55%, #22c1c3); box-shadow: 0 6px 16px rgba(76, 99, 255, .32); }
+  .top h1 { margin: 0; font-size: 21px; line-height: 1.15; font-weight: 750; letter-spacing: -.3px; }
+  .top p { margin: 2px 0 0; color: var(--hint); font-size: 13px; }
+  .top .grow { flex: 1; min-width: 0; }
+  .badge-pro { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 4px 9px; border-radius: 999px; color: #fff;
+               background: linear-gradient(135deg, #f7b500, #f0731b); }
+  .badge-free { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; color: var(--hint); background: var(--soft); }
+
+  /* ---------- общие блоки ---------- */
+  .card { background: var(--card); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+  .pad { padding: 14px 16px; }
+  .section { margin: 18px 6px 8px; font-size: 12.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--hint); }
+  .hint { color: var(--hint); font-size: 13px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .tiles.two { grid-template-columns: repeat(2, 1fr); }
+  .tile { background: var(--card); border-radius: 16px; padding: 12px 12px 11px; min-width: 0; }
+  .tile b { display: block; font-size: 22px; line-height: 1.1; font-weight: 750; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+  .tile span { display: block; margin-top: 3px; font-size: 12px; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.red b { color: var(--red); } .tile.amber b { color: var(--amber); } .tile.green b { color: var(--green); } .tile.violet b { color: var(--violet); }
+  .banner { display: flex; gap: 12px; align-items: flex-start; padding: 13px 14px; border-radius: var(--radius); margin-bottom: 10px;
+            background: linear-gradient(135deg, rgba(124, 92, 255, .16), rgba(47, 124, 246, .14)); font-size: 13.5px; }
+  .banner .ico { flex: none; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; color: #fff;
+                 background: linear-gradient(135deg, #7c5cff, #2f7cf6); }
+  .banner b { display: block; font-size: 14.5px; margin-bottom: 1px; }
+  .banner.warn { background: linear-gradient(135deg, rgba(240, 140, 0, .18), rgba(229, 72, 77, .12)); }
+  .banner.warn .ico { background: linear-gradient(135deg, #f7b500, #f0731b); }
+
+  .search { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 14px; padding: 0 12px; margin-bottom: 10px; color: var(--hint); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: inherit; padding: 11px 0; }
+  .search input::placeholder { color: var(--hint); }
+
+  .seg { display: flex; gap: 4px; background: var(--card); padding: 4px; border-radius: 14px; margin-bottom: 10px; }
+  .seg button { flex: 1; padding: 8px 6px; border-radius: 10px; font-weight: 650; font-size: 13.5px; color: var(--hint); transition: background .18s, color .18s; }
+  .seg button.on { background: var(--accent); color: var(--accent-text); }
+
+  /* ---------- аватар ---------- */
+  .ava { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+         font-weight: 700; font-size: 17px; letter-spacing: .3px; }
+  .ava.big { width: 68px; height: 68px; font-size: 25px; }
+  .ava.small { width: 36px; height: 36px; font-size: 13.5px; }
+
+  /* ---------- список чатов ---------- */
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 14px; position: relative; }
+  .row + .row::before { content: ""; position: absolute; left: 72px; right: 0; top: 0; height: 1px; background: var(--line); }
+  .row:active { background: var(--soft); }
+  .row .mid { flex: 1; min-width: 0; }
+  .row .name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; }
+  .row .name span { overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { color: var(--hint); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pills { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+          font-variant-numeric: tabular-nums; }
+  .pill.red { color: var(--red); background: rgba(229, 72, 77, .13); }
+  .pill.amber { color: var(--amber); background: rgba(240, 140, 0, .15); }
+  .pill.gray { color: var(--hint); background: var(--soft); }
+  .pill.green { color: var(--green); background: rgba(47, 179, 106, .15); }
+  .pill.gold { color: #fff; background: linear-gradient(135deg, #f7b500, #f0731b); }
+  .chev { color: var(--hint); opacity: .6; flex: none; }
+
+  /* ---------- карточка собеседника ---------- */
+  .hero { text-align: center; padding: 20px 16px 16px; }
+  .hero .ava { margin: 0 auto 10px; }
+  .hero h2 { margin: 0; font-size: 19px; font-weight: 720; }
+  .hero .hint { margin-top: 2px; }
+  .hero .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 14px; }
+  .hero .nums div { background: var(--soft); border-radius: 12px; padding: 8px 4px; }
+  .hero .nums b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .hero .nums span { font-size: 11px; color: var(--hint); }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { flex: 1; min-width: 0; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; border-radius: 12px;
+         font-weight: 650; font-size: 14px; background: var(--soft); color: var(--text); }
+  .btn.primary { background: var(--accent); color: var(--accent-text); }
+  .btn.danger { background: rgba(229, 72, 77, .13); color: var(--red); }
+  .btn:active { opacity: .7; } .btn:disabled { opacity: .5; }
+
+  /* ---------- события (удалённые и изменённые сообщения) ---------- */
+  .day { text-align: center; margin: 14px 0 8px; }
+  .day span { font-size: 12px; font-weight: 650; color: var(--hint); background: var(--card); padding: 4px 11px; border-radius: 999px; }
+  .ev { background: var(--card); border-radius: 16px; padding: 11px 13px 10px 16px; margin-bottom: 8px; position: relative; overflow: hidden; }
+  .ev::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--red); }
+  .ev.edited::before { background: var(--amber); }
+  .ev.both::before { background: linear-gradient(var(--amber), var(--red)); }
+  .ev-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .ev-head .who { font-weight: 650; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev-head time { color: var(--hint); font-size: 12.5px; flex: none; }
+  .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 7px; flex: none; }
+  .tag.red { color: var(--red); background: rgba(229, 72, 77, .13); }
+  .tag.amber { color: var(--amber); background: rgba(240, 140, 0, .15); }
+  .kind { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--link); margin-bottom: 3px; }
+  .ev .text { white-space: pre-wrap; }
+  .ev .text.clamp { display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
+  .more { color: var(--link); font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .was { margin: 0 0 6px; padding: 6px 9px; border-radius: 10px; background: var(--soft); }
+  .was small { display: block; color: var(--hint); font-size: 11.5px; font-weight: 650; margin-bottom: 1px; }
+  .was div { white-space: pre-wrap; color: var(--hint); text-decoration: line-through; text-decoration-color: rgba(128, 132, 145, .55); }
+  .nowlabel { color: var(--hint); font-size: 11.5px; font-weight: 650; margin-bottom: 1px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .fact { font-size: 11.5px; color: var(--hint); background: var(--soft); padding: 3px 8px; border-radius: 8px; white-space: nowrap; max-width: 100%;
+          overflow: hidden; text-overflow: ellipsis; }
+  .fact b { color: var(--text); font-weight: 600; }
+  .ev .btn { margin-top: 9px; width: 100%; flex: none; padding: 8px 12px; font-size: 13.5px; }
+  .lock { margin-top: 8px; font-size: 12.5px; color: var(--hint); }
+
+  /* ---------- графики ---------- */
+  .chart { display: flex; align-items: flex-end; gap: 4px; height: 118px; padding-top: 6px; }
+  .chart .col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
+  .chart .bar { border-radius: 5px 5px 2px 2px; min-height: 0; background: var(--red); transition: height .5s cubic-bezier(.2, .8, .2, 1); }
+  .chart .bar.amber { background: var(--amber); } .chart .bar.blue { background: var(--accent); } .chart .bar.violet { background: var(--violet); }
+  .chart .col.zero::after { content: ""; height: 3px; border-radius: 2px; background: var(--soft); }
+  .axis { display: flex; gap: 4px; margin-top: 6px; }
+  .axis span { flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow-wrap: normal; font-size: 10px; color: var(--hint); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--hint); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; background: var(--red); }
+  .legend i.amber { background: var(--amber); }
+  .meter { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  .meter .lbl { width: 108px; flex: none; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meter .track { flex: 1; height: 8px; border-radius: 5px; background: var(--soft); overflow: hidden; }
+  .meter .fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #7c5cff, #2f7cf6); }
+  .meter .val { width: 34px; flex: none; text-align: right; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 16px; position: relative; align-items: center; }
+  .kv + .kv::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 1px; background: var(--line); }
+  .kv span { color: var(--hint); flex: none; max-width: 62%; } .kv b { font-weight: 650; text-align: right; }
+
+  /* ---------- профиль ---------- */
+  .plan { padding: 18px 16px; color: #fff; border-radius: var(--radius); margin-bottom: 10px; position: relative; overflow: hidden;
+          background: linear-gradient(135deg, #7c5cff, #2f7cf6 60%, #22c1c3); }
+  .plan.pro { background: linear-gradient(135deg, #f7b500, #f0731b 60%, #e5484d); }
+  .plan::after { content: ""; position: absolute; right: -40px; top: -50px; width: 170px; height: 170px; border-radius: 50%; background: rgba(255, 255, 255, .13); }
+  .plan small { opacity: .85; font-size: 12.5px; font-weight: 650; letter-spacing: .5px; text-transform: uppercase; }
+  .plan h2 { margin: 2px 0 6px; font-size: 24px; font-weight: 780; letter-spacing: -.4px; }
+  .plan p { margin: 0; font-size: 13.5px; opacity: .93; max-width: 88%; }
+  .plan ul { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
+  .plan li { padding: 2px 0 2px 22px; position: relative; }
+  .plan li::before { content: "✓"; position: absolute; left: 2px; font-weight: 800; }
+  .plan .btn { margin-top: 12px; background: #fff; color: #1a1d24; position: relative; z-index: 1; width: 100%; }
+  .opt { display: flex; align-items: center; gap: 12px; padding: 12px 16px; position: relative; width: 100%; text-align: left; }
+  .opt + .opt::before { content: ""; position: absolute; left: 60px; right: 0; top: 0; height: 1px; background: var(--line); }
+  .opt .ic { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff; background: var(--accent); }
+  .opt .ic.red { background: var(--red); } .opt .ic.amber { background: var(--amber); } .opt .ic.green { background: var(--green); } .opt .ic.violet { background: var(--violet); }
+  .opt .mid { flex: 1; min-width: 0; } .opt .mid div { font-weight: 600; } .opt .mid small { color: var(--hint); font-size: 12.5px; display: block; }
+  .switch { flex: none; width: 48px; height: 29px; border-radius: 999px; background: var(--soft); position: relative; transition: background .2s; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 23px; height: 23px; border-radius: 50%; background: #fff;
+                   box-shadow: 0 1px 4px rgba(0, 0, 0, .25); transition: transform .2s; }
+  .switch.on { background: var(--green); } .switch.on::after { transform: translateX(19px); }
+  .langs { display: flex; gap: 4px; background: var(--soft); padding: 3px; border-radius: 10px; flex: none; }
+  .langs button { padding: 5px 9px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--hint); }
+  .langs button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+  .steps { margin: 0; padding: 4px 16px 14px 36px; font-size: 14px; } .steps li { padding: 3px 0; }
+
+  /* ---------- пустые экраны и загрузка ---------- */
+  .empty { text-align: center; padding: 44px 24px; color: var(--hint); }
+  .empty .ico { width: 68px; height: 68px; border-radius: 22px; margin: 0 auto 14px; display: grid; place-items: center; background: var(--card); color: var(--accent); }
+  .empty b { display: block; color: var(--text); font-size: 16.5px; margin-bottom: 4px; }
+  .skel { height: 66px; border-radius: 16px; margin-bottom: 8px; background: linear-gradient(90deg, var(--card) 25%, var(--soft) 50%, var(--card) 75%);
+          background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .fade { animation: fade .22s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+
+  /* ---------- нижнее меню ---------- */
+  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; justify-content: center; padding: 8px 12px calc(10px + var(--safe-b));
+        pointer-events: none; }
+  nav .bar { pointer-events: auto; display: flex; gap: 2px; width: 100%; max-width: 460px; padding: 6px; border-radius: 22px; background: var(--card);
+             box-shadow: 0 8px 28px rgba(0, 0, 0, .16), 0 0 0 1px var(--line); }
+  nav button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px 6px; border-radius: 16px;
+               color: var(--hint); font-size: 10.5px; font-weight: 650; transition: color .18s, background .18s; }
+  nav button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  nav button.on { color: var(--accent); background: var(--soft); }
+  .toast { position: fixed; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); z-index: 9; max-width: 86%;
+           background: rgba(20, 22, 28, .92); color: #fff; padding: 9px 15px; border-radius: 12px; font-size: 13.5px; text-align: center; animation: fade .2s; }
 </style>
 </head>
 <body>
-<div class="tabs">
-  <button id="tab-deleted" class="on"></button>
-  <button id="tab-edited"></button>
+<div class="top">
+  <div class="logo" id="logo"></div>
+  <div class="grow"><h1 id="title">Keeper</h1><p id="subtitle"></p></div>
+  <div id="plan-badge"></div>
 </div>
-<div id="banner"></div>
-<div id="list"></div>
+<main id="view"></main>
+<nav><div class="bar" id="nav"></div></nav>
 
 <script>
+// ============================================================================
 // Тексты мини-приложения на трёх языках.
+// ============================================================================
 const TEXTS = {
-  ru: { deleted: 'Удалённые', edited: 'Изменённые', empty: 'Пока пусто. Когда собеседник удалит или изменит сообщение, оно появится здесь.',
-        off: 'Бот не подключён к аккаунту. Откройте чат с ботом и нажмите /start — там инструкция.',
-        free: 'Бесплатный тариф: видны последние {n} записей, без файлов. Pro: команда /pro в чате с ботом.',
-        file: 'Прислать файл в чат', loading: 'Загрузка…', error: 'Не получилось загрузить. Попробуйте ещё раз.',
-        kinds: { photo: '🖼 Фото', video: '🎬 Видео', video_note: '⏺ Кружок', voice: '🎤 Голосовое', audio: '🎵 Аудио',
-                 document: '📎 Файл', animation: '🎞 GIF', sticker: '🙂 Стикер', other: '💬 Сообщение' } },
-  uz: { deleted: "O'chirilgan", edited: "O'zgartirilgan", empty: "Hozircha bo'sh. Suhbatdosh xabarni o'chirsa yoki o'zgartirsa, u shu yerda paydo bo'ladi.",
-        off: "Bot akkauntga ulanmagan. Bot bilan chatni oching va /start ni bosing — u yerda yo'riqnoma bor.",
-        free: "Bepul tarif: oxirgi {n} ta yozuv ko'rinadi, fayllarsiz. Pro: bot bilan chatda /pro buyrug'i.",
-        file: 'Faylni chatga yuborish', loading: 'Yuklanmoqda…', error: "Yuklab bo'lmadi. Qayta urinib ko'ring.",
-        kinds: { photo: '🖼 Rasm', video: '🎬 Video', video_note: '⏺ Dumaloq video', voice: '🎤 Ovozli xabar', audio: '🎵 Audio',
-                 document: '📎 Fayl', animation: '🎞 GIF', sticker: '🙂 Stiker', other: '💬 Xabar' } },
-  en: { deleted: 'Deleted', edited: 'Edited', empty: 'Nothing yet. When someone deletes or edits a message, it will appear here.',
-        off: 'The bot is not connected to your account. Open the chat with the bot and send /start for instructions.',
-        free: 'Free plan: the last {n} records, without files. Pro: send /pro in the chat with the bot.',
-        file: 'Send the file to chat', loading: 'Loading…', error: 'Could not load. Please try again.',
-        kinds: { photo: '🖼 Photo', video: '🎬 Video', video_note: '⏺ Video message', voice: '🎤 Voice message', audio: '🎵 Audio',
-                 document: '📎 File', animation: '🎞 GIF', sticker: '🙂 Sticker', other: '💬 Message' } },
+  ru: {
+    tabs: { chats: 'Чаты', feed: 'Лента', stats: 'Аналитика', me: 'Профиль', admin: 'Админ' },
+    sub: { chats: 'Кто удалял и менял сообщения', feed: 'Все события подряд', stats: 'Цифры по вашим чатам', me: 'Тариф и настройки', admin: 'Только для владельца бота' },
+    people: 'Собеседников', deleted: 'Удалено', edited: 'Изменено', saved: 'Сообщений', share: 'Удаляет',
+    search: 'Поиск по имени', all: 'Все', fDeleted: 'Удалённые', fEdited: 'Изменённые',
+    offTitle: 'Бот не подключён', off: 'Настройки Telegram → Telegram для бизнеса → Чат-боты → впишите бота. После этого здесь появятся чаты.',
+    freeTitle: 'Бесплатный тариф', free: 'Видны последние {n} записей, без файлов. Хранение {d} дн.',
+    emptyChats: 'Пока тихо', emptyChatsHint: 'Когда собеседник напишет вам, он появится в этом списке, а его удалённые и изменённые сообщения — внутри.',
+    emptyFeed: 'Событий нет', emptyFeedHint: 'Здесь появятся удалённые и изменённые сообщения.',
+    noEvents: 'ничего не удалял(а)', lastEvent: 'событие', msgs: 'сообщ.',
+    tagDeleted: 'Удалено', tagEdited: 'Изменено', was: 'Было', now: 'Стало', more: 'Показать полностью',
+    sentAt: 'Отправлено', deletedAt: 'Удалено', editedAt: 'Изменено', after: 'через', edits: 'правок',
+    size: 'Размер', duration: 'Длительность', file: 'Файл', forward: 'Переслано от', reply: 'Ответ на сообщение', viaBot: 'Через бота',
+    album: 'Часть альбома', spoiler: 'Скрытое медиа', links: 'Ссылок', senderId: 'ID отправителя', dim: 'Размер кадра',
+    sendFile: 'Прислать файл в чат', fileLocked: '🔒 Файл доступен в Pro', sending: 'Отправляю…',
+    mute: 'Без звука', unmute: 'Со звуком', openChat: 'Открыть чат', muted: 'Уведомления по этому чату выключены', unmuted: 'Уведомления по этому чату включены',
+    first: 'Первое сообщение', last: 'Последнее сообщение',
+    byDay: 'Последние 14 дней', byHour: 'В какое время удаляют', byHourHint: 'Часы по вашему местному времени',
+    byKind: 'Что удаляют', top: 'Кто чаще всего удаляет и меняет', speed: 'Скорость удаления',
+    median: 'Обычно удаляют через', fastest: 'Самое быстрое удаление', stored: 'Сообщений в хранилище', sample: 'Удалений в расчёте',
+    noStats: 'Данных пока мало', noStatsHint: 'Аналитика появится после первых удалённых или изменённых сообщений.',
+    planFree: 'Бесплатный', planPro: 'Pro', planNow: 'Ваш тариф', until: 'Активен до {date}',
+    freeDesc: 'Тексты удалённых и изменённых сообщений, хранение {d} дн.',
+    perks: ['Удалённые фото, видео, голосовые и файлы', 'Полная история — до {n} записей', 'Хранение {d} дней'],
+    buy: 'Подключить Pro — ⭐️ {stars} в месяц', buyHint: 'Оплата звёздами Telegram в чате с ботом',
+    notify: 'Уведомления в чат', notifyOn: 'Бот пишет о каждом удалении и правке', notifyOff: 'Тихий режим: всё только здесь',
+    lang: 'Язык', connection: 'Подключение', connected: 'Бот подключён к аккаунту', notConnected: 'Бот не подключён',
+    wipe: 'Удалить все данные', wipeHint: 'Сообщения, чаты и счётчики', wipeAsk: 'Удалить все сохранённые сообщения и чаты? Вернуть их будет нельзя.', wiped: 'Все данные удалены',
+    how: 'Как подключить', steps: ['Откройте Настройки Telegram', '«Telegram для бизнеса» → «Чат-боты»', 'Впишите имя бота и разрешите доступ к личным чатам'],
+    privacy: 'Ваши собственные сообщения и защищённый от копирования контент не сохраняются.',
+    aUsers: 'Пользователей', aConn: 'Подключено', aPro: 'С Pro', aStars: 'Звёзд', aMsgs: 'В хранилище', aChats: 'Чатов', aDeleted: 'Удалений', aEdited: 'Правок',
+    aNew: 'Новые пользователи за 14 дней', aList: 'Пользователи', aPays: 'Последние оплаты', aNoPays: 'Оплат пока не было',
+    aNote: 'Админ видит только цифры. Тексты сообщений пользователей здесь не показываются.',
+    aGive: 'Pro для {name}', aGiveHint: 'Сейчас: {state}', a30: '+30 дней', a365: '+1 год', aOff: 'Снять Pro', aDone: 'Готово', aNoPro: 'нет Pro', aChatsShort: 'чатов', aOn: 'подключён', aOffline: 'не подключён',
+    cancel: 'Отмена', error: 'Не получилось загрузить', retry: 'Повторить', today: 'Сегодня', yesterday: 'Вчера',
+    units: { s: 'с', m: 'мин', h: 'ч', d: 'дн' },
+    kinds: { text: 'Текст', photo: 'Фото', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое', audio: 'Аудио', document: 'Файл', animation: 'GIF', sticker: 'Стикер', other: 'Другое' },
+    types: { contact: 'Контакт', location: 'Место на карте', poll: 'Опрос', dice: 'Кубик' },
+  },
+  uz: {
+    tabs: { chats: 'Chatlar', feed: 'Tasma', stats: 'Tahlil', me: 'Profil', admin: 'Admin' },
+    sub: { chats: "Kim xabarlarni o'chirgan va o'zgartirgan", feed: 'Barcha hodisalar ketma-ket', stats: "Chatlaringiz bo'yicha raqamlar", me: 'Tarif va sozlamalar', admin: 'Faqat bot egasi uchun' },
+    people: 'Suhbatdoshlar', deleted: "O'chirilgan", edited: "O'zgartirilgan", saved: 'Xabarlar', share: "O'chiradi",
+    search: "Ism bo'yicha qidirish", all: 'Hammasi', fDeleted: "O'chirilgan", fEdited: "O'zgartirilgan",
+    offTitle: 'Bot ulanmagan', off: "Telegram sozlamalari → Telegram biznes uchun → Chat-botlar → botni yozing. Shundan so'ng chatlar shu yerda paydo bo'ladi.",
+    freeTitle: 'Bepul tarif', free: "Oxirgi {n} ta yozuv ko'rinadi, fayllarsiz. {d} kun saqlanadi.",
+    emptyChats: 'Hozircha jim', emptyChatsHint: "Suhbatdosh sizga yozganda, u shu ro'yxatda paydo bo'ladi, o'chirilgan va o'zgartirilgan xabarlari esa ichida.",
+    emptyFeed: "Hodisalar yo'q", emptyFeedHint: "Bu yerda o'chirilgan va o'zgartirilgan xabarlar paydo bo'ladi.",
+    noEvents: "hech narsa o'chirmagan", lastEvent: 'hodisa', msgs: 'xabar',
+    tagDeleted: "O'chirilgan", tagEdited: "O'zgartirilgan", was: 'Avval', now: 'Hozir', more: "To'liq ko'rsatish",
+    sentAt: 'Yuborilgan', deletedAt: "O'chirilgan", editedAt: "O'zgartirilgan", after: "o'tib", edits: 'tahrir',
+    size: 'Hajmi', duration: 'Davomiyligi', file: 'Fayl', forward: 'Kimdan uzatilgan', reply: 'Xabarga javob', viaBot: 'Bot orqali',
+    album: 'Albom qismi', spoiler: 'Yashirin media', links: 'Havolalar', senderId: 'Yuboruvchi ID', dim: "Kadr o'lchami",
+    sendFile: 'Faylni chatga yuborish', fileLocked: '🔒 Fayl Pro tarifida', sending: 'Yuborilmoqda…',
+    mute: 'Ovozsiz', unmute: 'Ovozli', openChat: 'Chatni ochish', muted: "Bu chat bo'yicha bildirishnomalar o'chirildi", unmuted: "Bu chat bo'yicha bildirishnomalar yoqildi",
+    first: 'Birinchi xabar', last: 'Oxirgi xabar',
+    byDay: "So'nggi 14 kun", byHour: "Qaysi vaqtda o'chirishadi", byHourHint: "Soatlar mahalliy vaqtingiz bo'yicha",
+    byKind: "Nimani o'chirishadi", top: "Kim ko'proq o'chiradi va o'zgartiradi", speed: "O'chirish tezligi",
+    median: "Odatda shuncha vaqtdan so'ng o'chirishadi", fastest: "Eng tez o'chirish", stored: 'Saqlangan xabarlar', sample: "Hisobdagi o'chirishlar",
+    noStats: "Ma'lumot hali kam", noStatsHint: "Tahlil birinchi o'chirilgan yoki o'zgartirilgan xabarlardan keyin paydo bo'ladi.",
+    planFree: 'Bepul', planPro: 'Pro', planNow: 'Tarifingiz', until: '{date} gacha faol',
+    freeDesc: "O'chirilgan va o'zgartirilgan xabarlar matni, {d} kun saqlanadi.",
+    perks: ["O'chirilgan rasm, video, ovozli xabar va fayllar", "To'liq tarix — {n} tagacha yozuv", '{d} kun saqlash'],
+    buy: 'Pro ulash — oyiga ⭐️ {stars}', buyHint: "Bot bilan chatda Telegram yulduzlari bilan to'lov",
+    notify: 'Chatga bildirishnomalar', notifyOn: "Bot har bir o'chirish va tahrir haqida yozadi", notifyOff: 'Jim rejim: hammasi faqat shu yerda',
+    lang: 'Til', connection: 'Ulanish', connected: 'Bot akkauntga ulangan', notConnected: 'Bot ulanmagan',
+    wipe: "Barcha ma'lumotlarni o'chirish", wipeHint: 'Xabarlar, chatlar va hisoblagichlar', wipeAsk: "Barcha saqlangan xabar va chatlar o'chirilsinmi? Ularni qaytarib bo'lmaydi.", wiped: "Barcha ma'lumotlar o'chirildi",
+    how: 'Qanday ulanadi', steps: ['Telegram sozlamalarini oching', '«Telegram biznes uchun» → «Chat-botlar»', 'Bot nomini yozing va shaxsiy chatlarga ruxsat bering'],
+    privacy: "O'z xabarlaringiz va nusxalashdan himoyalangan kontent saqlanmaydi.",
+    aUsers: 'Foydalanuvchilar', aConn: 'Ulangan', aPro: 'Pro bilan', aStars: 'Yulduzlar', aMsgs: 'Saqlangan', aChats: 'Chatlar', aDeleted: "O'chirishlar", aEdited: 'Tahrirlar',
+    aNew: '14 kundagi yangi foydalanuvchilar', aList: 'Foydalanuvchilar', aPays: "So'nggi to'lovlar", aNoPays: "To'lovlar hali yo'q",
+    aNote: "Admin faqat raqamlarni ko'radi. Foydalanuvchilar xabarlari matni bu yerda ko'rsatilmaydi.",
+    aGive: '{name} uchun Pro', aGiveHint: 'Hozir: {state}', a30: '+30 kun', a365: '+1 yil', aOff: 'Pro ni olib tashlash', aDone: 'Tayyor', aNoPro: "Pro yo'q", aChatsShort: 'chat', aOn: 'ulangan', aOffline: 'ulanmagan',
+    cancel: 'Bekor qilish', error: "Yuklab bo'lmadi", retry: 'Qayta urinish', today: 'Bugun', yesterday: 'Kecha',
+    units: { s: 's', m: 'daq', h: 'soat', d: 'kun' },
+    kinds: { text: 'Matn', photo: 'Rasm', video: 'Video', video_note: 'Dumaloq video', voice: 'Ovozli xabar', audio: 'Audio', document: 'Fayl', animation: 'GIF', sticker: 'Stiker', other: 'Boshqa' },
+    types: { contact: 'Kontakt', location: 'Xaritadagi joy', poll: "So'rovnoma", dice: 'Kubik' },
+  },
+  en: {
+    tabs: { chats: 'Chats', feed: 'Feed', stats: 'Insights', me: 'Profile', admin: 'Admin' },
+    sub: { chats: 'Who deleted and edited messages', feed: 'Every event in one place', stats: 'Numbers for your chats', me: 'Plan and settings', admin: 'Bot owner only' },
+    people: 'People', deleted: 'Deleted', edited: 'Edited', saved: 'Messages', share: 'Deletes',
+    search: 'Search by name', all: 'All', fDeleted: 'Deleted', fEdited: 'Edited',
+    offTitle: 'The bot is not connected', off: 'Telegram Settings → Telegram Business → Chatbots → enter the bot. Your chats will then appear here.',
+    freeTitle: 'Free plan', free: 'The last {n} records, without files. Kept for {d} days.',
+    emptyChats: 'Quiet so far', emptyChatsHint: 'When someone writes to you, they appear in this list, with their deleted and edited messages inside.',
+    emptyFeed: 'No events', emptyFeedHint: 'Deleted and edited messages will appear here.',
+    noEvents: 'deleted nothing', lastEvent: 'event', msgs: 'msgs',
+    tagDeleted: 'Deleted', tagEdited: 'Edited', was: 'Before', now: 'Now', more: 'Show all',
+    sentAt: 'Sent', deletedAt: 'Deleted', editedAt: 'Edited', after: 'after', edits: 'edits',
+    size: 'Size', duration: 'Length', file: 'File', forward: 'Forwarded from', reply: 'Reply to a message', viaBot: 'Via bot',
+    album: 'Part of an album', spoiler: 'Hidden media', links: 'Links', senderId: 'Sender ID', dim: 'Dimensions',
+    sendFile: 'Send the file to chat', fileLocked: '🔒 The file is available with Pro', sending: 'Sending…',
+    mute: 'Mute', unmute: 'Unmute', openChat: 'Open chat', muted: 'Notifications for this chat are off', unmuted: 'Notifications for this chat are on',
+    first: 'First message', last: 'Last message',
+    byDay: 'Last 14 days', byHour: 'When messages get deleted', byHourHint: 'Hours in your local time',
+    byKind: 'What gets deleted', top: 'Who deletes and edits the most', speed: 'Deletion speed',
+    median: 'Usually deleted after', fastest: 'Fastest deletion', stored: 'Messages in storage', sample: 'Deletions counted',
+    noStats: 'Not enough data yet', noStatsHint: 'Insights appear after the first deleted or edited messages.',
+    planFree: 'Free', planPro: 'Pro', planNow: 'Your plan', until: 'Active until {date}',
+    freeDesc: 'Text of deleted and edited messages, kept for {d} days.',
+    perks: ['Deleted photos, videos, voice messages and files', 'Full history — up to {n} records', 'Kept for {d} days'],
+    buy: 'Get Pro — ⭐️ {stars} a month', buyHint: 'Paid with Telegram Stars in the chat with the bot',
+    notify: 'Notifications in chat', notifyOn: 'The bot writes about every deletion and edit', notifyOff: 'Quiet mode: everything stays here',
+    lang: 'Language', connection: 'Connection', connected: 'The bot is connected to your account', notConnected: 'The bot is not connected',
+    wipe: 'Delete all data', wipeHint: 'Messages, chats and counters', wipeAsk: 'Delete all saved messages and chats? This cannot be undone.', wiped: 'All data deleted',
+    how: 'How to connect', steps: ['Open Telegram Settings', '“Telegram Business” → “Chatbots”', 'Enter the bot name and allow access to private chats'],
+    privacy: 'Your own messages and copy-protected content are never saved.',
+    aUsers: 'Users', aConn: 'Connected', aPro: 'With Pro', aStars: 'Stars', aMsgs: 'In storage', aChats: 'Chats', aDeleted: 'Deletions', aEdited: 'Edits',
+    aNew: 'New users in 14 days', aList: 'Users', aPays: 'Recent payments', aNoPays: 'No payments yet',
+    aNote: 'The admin sees numbers only. The text of users’ messages is never shown here.',
+    aGive: 'Pro for {name}', aGiveHint: 'Now: {state}', a30: '+30 days', a365: '+1 year', aOff: 'Remove Pro', aDone: 'Done', aNoPro: 'no Pro', aChatsShort: 'chats', aOn: 'connected', aOffline: 'not connected',
+    cancel: 'Cancel', error: 'Could not load', retry: 'Try again', today: 'Today', yesterday: 'Yesterday',
+    units: { s: 's', m: 'min', h: 'h', d: 'd' },
+    kinds: { text: 'Text', photo: 'Photo', video: 'Video', video_note: 'Video message', voice: 'Voice message', audio: 'Audio', document: 'File', animation: 'GIF', sticker: 'Sticker', other: 'Other' },
+    types: { contact: 'Contact', location: 'Location', poll: 'Poll', dice: 'Dice' },
+  },
 };
 
+// Значки (простые контурные рисунки). Это наш собственный текст, поэтому вставлять его как HTML безопасно.
+const svg = (d, size = 22) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  chats: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/>',
+  feed: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  stats: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  me: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-3.6 4.4-5 8-5s6.5 1.4 8 5"/>',
+  admin: '<path d="M12 3l8 3v6c0 4.6-3.2 7.9-8 9-4.8-1.1-8-4.4-8-9V6l8-3Z"/><path d="M9 12l2 2 4-4"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.6-3.2 7.9-8 9-4.8-1.1-8-4.4-8-9V6l8-3Z"/><path d="M9.5 12.5l2 2 3.5-4"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  bell: '<path d="M6 9a6 6 0 1 1 12 0c0 6 2 7 2 7H4s2-1 2-7Z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  bellOff: '<path d="M6 9a6 6 0 0 1 9.5-4.9M18 9c0 6 2 7 2 7H8"/><path d="M10 20a2 2 0 0 0 4 0M3 3l18 18"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.700l1-1"/>',
+  send: '<path d="M21 3L10 14M21 3l-7 18-4-7-7-4 18-7Z"/>',
+  star: '<path d="M12 3l2.7 5.8 6.3.8-4.6 4.4 1.2 6.300L12 17.200 6.400 20.300l1.200-6.300L3 9.600l6.300-.8L12 3Z"/>',
+  inbox: '<path d="M4 13l2.500-8h11L20 13v6H4v-6Z"/><path d="M4 13h5a3 3 0 0 0 6 0h5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.5"/>',
+  file: '<path d="M14 3H7v18h10V6l-3-3Z"/><path d="M14 3v3h3"/>',
+};
+const icon = (name, size) => svg(ICON[name], size);
+
+// ============================================================================
+// Подключение к Telegram и вызов серверных функций (endpoints).
+// ============================================================================
 const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
+try { tg.setHeaderColor('secondary_bg_color'); tg.setBackgroundColor('secondary_bg_color'); } catch { /* старый Telegram */ }
 
-const guess = (tg.initDataUnsafe.user?.language_code || 'en').slice(0, 2);
+const call = (name, input = {}) => new Promise((resolve, reject) => {
+  tg.Serverless.call(name, input, (err, data) => (err ? reject(err) : resolve(data)));
+});
+const haptic = (kind = 'light') => { try { tg.HapticFeedback.impactOccurred(kind); } catch { /* нет вибрации */ } };
+
+const guess = (tg.initDataUnsafe?.user?.language_code || 'en').slice(0, 2);
 let L = TEXTS[guess] || TEXTS.en;
-let tab = 'deleted';
-const $ = (id) => document.getElementById(id);
+let lang = TEXTS[guess] ? guess : 'en';
+let me = null;          // профиль: тариф, язык, подключение, права админа
+let tab = 'chats';      // текущая вкладка
+let openChat = null;    // открытый собеседник (или null)
+let filter = 'all';     // фильтр ленты: all | deleted | edited
+let query = '';         // строка поиска по чатам
+let chatsCache = [];
 
-// Создаёт элемент с текстом. Текст вставляется как текст, а не как HTML — так безопасно.
-function el(tag, cls, text) {
+const $ = (id) => document.getElementById(id);
+const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+
+// Создаёт элемент. Текст вставляется как текст, а не как HTML — так чужое сообщение не сломает страницу.
+function h(tag, props = {}, ...kids) {
   const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text !== undefined) node.textContent = text;
+  for (const [k, v] of Object.entries(props)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'html') node.innerHTML = v;          // только для наших значков
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (k === 'style') node.style.cssText = v;
+    else node.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    node.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
   return node;
 }
 
-const when = (unix) => new Date(unix * 1000).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+// ---------- время, размеры, имена ----------
+const locale = () => ({ ru: 'ru-RU', uz: 'uz-UZ', en: 'en-GB' })[lang] || 'en-GB';
+const clock = (unix) => new Date(unix * 1000).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+const dayKey = (unix) => { const d = new Date(unix * 1000); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+function dayName(unix) {
+  const today = Date.now() / 1000;
+  if (dayKey(unix) === dayKey(today)) return L.today;
+  if (dayKey(unix) === dayKey(today - 86400)) return L.yesterday;
+  return new Date(unix * 1000).toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
+}
+const shortDate = (unix) => new Date(unix * 1000).toLocaleDateString(locale(), { day: '2-digit', month: '2-digit' });
+const fullDate = (unix) => new Date(unix * 1000).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' });
+const midDate = (unix) => new Date(unix * 1000).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
+const stamp = (unix) => (dayKey(unix) === dayKey(Date.now() / 1000) ? clock(unix) : `${shortDate(unix)} ${clock(unix)}`);
+function span(sec) {
+  const u = L.units;
+  if (sec < 60) return `${Math.max(1, Math.round(sec))} ${u.s}`;
+  if (sec < 3600) return `${Math.round(sec / 60)} ${u.m}`;
+  if (sec < 86400) return `${Math.round(sec / 360) / 10} ${u.h}`;
+  return `${Math.round(sec / 8640) / 10} ${u.d}`;
+}
+const bytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 102.4) / 10} KB` : `${Math.round(n / 104857.6) / 10} MB`);
+const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const num = (n) => Number(n || 0).toLocaleString(locale());
 
-function labels() {
-  $('tab-deleted').textContent = L.deleted;
-  $('tab-edited').textContent = L.edited;
+const PALETTE = [['#ff8a5c', '#ff5e62'], ['#f7b500', '#f0731b'], ['#7c5cff', '#b06cff'], ['#2fb36a', '#22c1a3'], ['#22b8e6', '#2f7cf6'], ['#ff6fae', '#e5484d'], ['#5c7cfa', '#7c5cff']];
+function avatar(name, id, cls = '') {
+  const [a, b] = PALETTE[Math.abs(Number(id) || 0) % PALETTE.length];
+  const letters = Array.from(String(name || '?').trim()).filter((c) => /\p{L}|\p{N}/u.test(c));
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+  const initials = (words.length > 1 ? Array.from(words[0])[0] + Array.from(words[1])[0] : letters.slice(0, 1).join('')) || '?';
+  return h('div', { class: `ava ${cls}`, style: `background: linear-gradient(135deg, ${a}, ${b})` }, initials.toUpperCase());
 }
 
-function render(data) {
-  L = TEXTS[data.lang] || L;
-  labels();
-  const banner = $('banner');
-  banner.replaceChildren();
-  if (!data.connected) banner.append(el('div', 'banner', L.off));
-  else if (!data.pro) banner.append(el('div', 'banner', L.free.replace('{n}', data.limit)));
+function toast(text) {
+  document.querySelector('.toast')?.remove();
+  const node = h('div', { class: 'toast' }, text);
+  document.body.append(node);
+  setTimeout(() => node.remove(), 2200);
+}
 
-  const list = $('list');
-  list.replaceChildren();
-  if (!data.items.length) return list.append(el('div', 'note', L.empty));
+// ============================================================================
+// Каркас: шапка, нижнее меню, смена экранов.
+// ============================================================================
+function chrome() {
+  const title = openChat && tab === 'chats' ? openChat.name : L.tabs[tab];
+  $('title').textContent = tab === 'chats' && !openChat ? 'Keeper' : title;
+  $('subtitle').textContent = openChat && tab === 'chats' ? (openChat.username ? `@${openChat.username}` : L.sub.chats) : L.sub[tab];
+  $('logo').innerHTML = icon('shield', 24);
+  const badge = $('plan-badge');
+  badge.replaceChildren(me ? h('span', { class: me.pro ? 'badge-pro' : 'badge-free' }, me.pro ? 'PRO' : L.planFree) : '');
 
-  for (const item of data.items) {
-    const card = el('div', 'card');
-    const head = el('div', 'head');
-    head.append(el('div', 'name', item.name), el('div', 'time', when(item.at)));
-    card.append(head);
-    if (item.kind !== 'text') card.append(el('div', 'kind', L.kinds[item.kind] || L.kinds.other));
-    for (const old of item.versions) card.append(el('div', 'old', old || '—'));
-    if (item.text) card.append(el('div', 'text', item.text));
-    if (item.hasFile && data.pro) {
-      const btn = el('button', 'file', L.file);
-      btn.onclick = () => {
-        btn.disabled = true;
-        tg.Serverless.call('sendMedia', { id: item.id }, (err, res) => {
-          btn.disabled = false;
-          tg.showAlert(err ? err.message : res.message);
-        });
-      };
-      card.append(btn);
-    }
-    list.append(card);
+  const names = ['chats', 'feed', 'stats', 'me'];
+  if (me?.admin) names.push('admin');
+  $('nav').replaceChildren(...names.map((name) => h('button', {
+    class: name === tab ? 'on' : '',
+    onclick: () => { haptic(); go(name); },
+  }, h('i', { html: icon(name, 22) }), h('span', {}, L.tabs[name]))));
+
+  if (openChat && tab === 'chats') { tg.BackButton.show(); } else { tg.BackButton.hide(); }
+}
+tg.BackButton.onClick(() => { openChat = null; go('chats'); });
+
+function go(name) {
+  if (name !== tab) { openChat = name === 'chats' ? openChat : null; filter = 'all'; }
+  tab = name;
+  chrome();
+  window.scrollTo(0, 0);
+  ({ chats: openChat ? showChat : showChats, feed: showFeed, stats: showStats, me: showMe, admin: showAdmin })[tab]();
+}
+
+const view = () => $('view');
+function loading(n = 5) { view().replaceChildren(...Array.from({ length: n }, () => h('div', { class: 'skel' }))); }
+function failed(retry) {
+  view().replaceChildren(h('div', { class: 'empty fade' }, h('div', { class: 'ico', html: icon('info', 30) }), h('b', {}, L.error),
+    h('button', { class: 'btn primary', style: 'margin-top:12px; display:inline-flex; flex:none; padding:10px 22px', onclick: retry }, L.retry)));
+}
+// Запоминает профиль из ответа сервера и переключает язык, если он поменялся.
+function remember(data) {
+  me = data;
+  if (TEXTS[data.lang] && data.lang !== lang) { lang = data.lang; L = TEXTS[lang]; }
+  chrome();
+}
+function empty(title, hint, name = 'inbox') {
+  return h('div', { class: 'empty fade' }, h('div', { class: 'ico', html: icon(name, 32) }), h('b', {}, title), hint);
+}
+function banners() {
+  if (!me.connected) return h('div', { class: 'banner warn' }, h('div', { class: 'ico', html: icon('link', 19) }), h('div', {}, h('b', {}, L.offTitle), L.off));
+  if (!me.pro) {
+    return h('button', { class: 'banner', style: 'width:100%; text-align:left', onclick: () => go('me') },
+      h('div', { class: 'ico', html: icon('star', 19) }), h('div', {}, h('b', {}, L.freeTitle), fill(L.free, { n: me.limit, d: me.freeDays })));
   }
+  return null;
 }
+const segmented = (onPick) => h('div', { class: 'seg' }, [['all', L.all], ['deleted', L.fDeleted], ['edited', L.fEdited]].map(([key, label]) => h('button', {
+  class: key === filter ? 'on' : '', onclick: () => { haptic(); filter = key; onPick(); },
+}, label)));
 
-function load() {
-  $('list').replaceChildren(el('div', 'note', L.loading));
-  tg.Serverless.call('feed', { type: tab }, (err, data) => {
-    if (err) return $('list').replaceChildren(el('div', 'note', L.error));
-    render(data);
-  });
-}
+// ============================================================================
+// Экран «Чаты»: список собеседников.
+// ============================================================================
+async function showChats() {
+  if (!chatsCache.length) loading();
+  let data;
+  try { data = await call('chats'); } catch { return failed(showChats); }
+  if (tab !== 'chats' || openChat) return;
+  remember(data);
+  chatsCache = data.chats;
+  const sum = (key) => data.chats.reduce((n, c) => n + c[key], 0);
 
-for (const name of ['deleted', 'edited']) {
-  $(`tab-${name}`).onclick = () => {
-    tab = name;
-    $('tab-deleted').classList.toggle('on', name === 'deleted');
-    $('tab-edited').classList.toggle('on', name === 'edited');
-    load();
+  const list = h('div', { class: 'card' });
+  const draw = () => {
+    const q = query.trim().toLowerCase();
+    const rows = chatsCache.filter((c) => !q || c.name.toLowerCase().includes(q) || c.username.toLowerCase().includes(q));
+    list.replaceChildren(...rows.map(chatRow));
+    list.style.display = rows.length ? '' : 'none';
   };
+  const input = h('input', { type: 'search', placeholder: L.search, value: query, oninput: (e) => { query = e.target.value; draw(); } });
+
+  view().replaceChildren(h('div', { class: 'fade' },
+    banners(),
+    h('div', { class: 'tiles' },
+      h('div', { class: 'tile' }, h('b', {}, num(data.chats.length)), h('span', {}, L.people)),
+      h('div', { class: 'tile red' }, h('b', {}, num(sum('deleted'))), h('span', {}, L.deleted)),
+      h('div', { class: 'tile amber' }, h('b', {}, num(sum('edited'))), h('span', {}, L.edited))),
+    data.chats.length
+      ? [data.chats.length > 6 && h('div', { class: 'search' }, h('i', { html: icon('search', 18) }), input), list]
+      : empty(L.emptyChats, L.emptyChatsHint, 'chats'),
+  ));
+  draw();
 }
 
-labels();
-load();
+function chatRow(c) {
+  const sub = c.eventAt
+    ? `${c.username ? `@${c.username} · ` : ''}${L.lastEvent} ${stamp(c.eventAt)}`
+    : `${c.username ? `@${c.username} · ` : ''}${num(c.saved)} ${L.msgs}, ${L.noEvents}`;
+  return h('button', { class: 'row', onclick: () => { haptic(); openChat = c; filter = 'all'; go('chats'); } },
+    avatar(c.name, c.chatId),
+    h('div', { class: 'mid' },
+      h('div', { class: 'name' }, h('span', {}, c.name || '?'), c.muted && h('i', { class: 'hint', html: icon('bellOff', 14) })),
+      h('div', { class: 'sub' }, sub)),
+    h('div', { class: 'pills' },
+      c.deleted > 0 && h('span', { class: 'pill red' }, `🗑 ${num(c.deleted)}`),
+      c.edited > 0 && h('span', { class: 'pill amber' }, `✏️ ${num(c.edited)}`),
+      !c.deleted && !c.edited && h('span', { class: 'pill gray' }, num(c.saved))),
+    h('i', { class: 'chev', html: icon('chev', 18) }));
+}
+
+// ============================================================================
+// Экран одного собеседника: карточка с цифрами и его удалённые и изменённые сообщения.
+// ============================================================================
+async function showChat() {
+  const c = openChat;
+  const listBox = h('div', {}, Array.from({ length: 3 }, () => h('div', { class: 'skel' })));
+  const share = c.saved ? Math.round((c.deleted / c.saved) * 100) : 0;
+  const muteBtn = h('button', { class: 'btn' });
+  const paintMute = () => {
+    muteBtn.replaceChildren(h('i', { html: icon(c.muted ? 'bell' : 'bellOff', 17) }), c.muted ? L.unmute : L.mute);
+  };
+  muteBtn.onclick = async () => {
+    haptic('medium');
+    c.muted = !c.muted;
+    paintMute();
+    try { await call('settings', { mute: { chatId: c.chatId, muted: c.muted } }); toast(c.muted ? L.muted : L.unmuted); } catch { c.muted = !c.muted; paintMute(); }
+  };
+  paintMute();
+
+  view().replaceChildren(h('div', { class: 'fade' },
+    h('div', { class: 'card hero' },
+      avatar(c.name, c.chatId, 'big'),
+      h('h2', {}, c.name || '?'),
+      h('div', { class: 'hint' }, [c.username && `@${c.username}`, `ID ${c.chatId}`].filter(Boolean).join(' · ')),
+      h('div', { class: 'nums' },
+        h('div', {}, h('b', {}, num(c.saved)), h('span', {}, L.saved)),
+        h('div', {}, h('b', { style: 'color:var(--red)' }, num(c.deleted)), h('span', {}, L.deleted)),
+        h('div', {}, h('b', { style: 'color:var(--amber)' }, num(c.edited)), h('span', {}, L.edited)),
+        h('div', {}, h('b', {}, `${share}%`), h('span', {}, L.share))),
+      h('div', { class: 'actions' },
+        muteBtn,
+        c.username && h('button', { class: 'btn primary', onclick: () => tg.openTelegramLink(`https://t.me/${c.username}`) }, h('i', { html: icon('send', 17) }), L.openChat))),
+    h('div', { class: 'card' },
+      h('div', { class: 'kv' }, h('span', {}, L.first), h('b', {}, c.firstAt ? `${midDate(c.firstAt)}, ${clock(c.firstAt)}` : '—')),
+      h('div', { class: 'kv' }, h('span', {}, L.last), h('b', {}, c.lastAt ? `${midDate(c.lastAt)}, ${clock(c.lastAt)}` : '—'))),
+    segmented(showChat),
+    listBox,
+  ));
+
+  let data;
+  try { data = await call('feed', { type: filter, chatId: c.chatId }); } catch { return listBox.replaceChildren(h('div', { class: 'empty' }, L.error)); }
+  if (openChat !== c) return;
+  remember(data);
+  listBox.replaceChildren(...(data.items.length ? events(data.items, false) : [empty(L.emptyFeed, L.emptyFeedHint)]));
+}
+
+// ============================================================================
+// Экран «Лента»: все события подряд.
+// ============================================================================
+async function showFeed() {
+  loading();
+  let data;
+  try { data = await call('feed', { type: filter }); } catch { return failed(showFeed); }
+  if (tab !== 'feed') return;
+  remember(data);
+  view().replaceChildren(h('div', { class: 'fade' },
+    banners(), segmented(showFeed),
+    data.items.length ? events(data.items, true) : empty(L.emptyFeed, L.emptyFeedHint)));
+}
+
+// Список событий с разделителями по дням.
+function events(items, withName) {
+  const out = [];
+  let last = '';
+  for (const item of items) {
+    const key = dayKey(item.at);
+    if (key !== last) { out.push(h('div', { class: 'day' }, h('span', {}, dayName(item.at)))); last = key; }
+    out.push(eventCard(item, withName));
+  }
+  return out;
+}
+
+function eventCard(item, withName) {
+  const meta = item.meta || {};
+  const cls = item.deletedAt && item.editedAt ? 'both' : item.deletedAt ? 'deleted' : 'edited';
+  const card = h('div', { class: `ev ${cls}` });
+
+  card.append(h('div', { class: 'ev-head' },
+    withName && avatar(item.name, item.chatId, 'small'),
+    withName && h('div', { class: 'who' }, item.name),
+    item.deletedAt && h('span', { class: 'tag red' }, L.tagDeleted),
+    item.editedAt && h('span', { class: 'tag amber' }, L.tagEdited),
+    h('time', { style: withName ? '' : 'margin-left:auto' }, clock(item.at))));
+
+  if (item.kind !== 'text') {
+    const label = meta.type ? L.types[meta.type] : L.kinds[item.kind] || L.kinds.other;
+    card.append(h('div', { class: 'kind' }, h('i', { html: icon('file', 15) }), [label, meta.emoji, meta.title].filter(Boolean).join(' · ')));
+  }
+  // Что было до правок — от самой старой версии к новой.
+  for (const v of item.versions) {
+    card.append(h('div', { class: 'was' }, h('small', {}, `${L.was} · ${stamp(v.at)}`), h('div', {}, v.text || '—')));
+  }
+  if (item.versions.length && item.text) card.append(h('div', { class: 'nowlabel' }, L.now));
+  if (item.text) {
+    const text = h('div', { class: 'text clamp' }, item.text);
+    card.append(text);
+    if (item.text.length > 420 || item.text.split('\n').length > 8) {
+      const more = h('button', { class: 'more', onclick: () => { text.classList.remove('clamp'); more.remove(); } }, L.more);
+      card.append(more);
+    }
+  }
+
+  // Подробности: когда отправлено, когда удалено, сколько «прожило», данные файла и т. д.
+  const facts = h('div', { class: 'facts' });
+  const fact = (label, value) => facts.append(h('span', { class: 'fact' }, `${label} `, value !== undefined && h('b', {}, value)));
+  fact(L.sentAt, stamp(item.date));
+  if (item.deletedAt) fact(L.deletedAt, `${stamp(item.deletedAt)}${item.deletedAt >= item.date ? ` · ${L.after} ${span(item.deletedAt - item.date)}` : ''}`);
+  if (item.editedAt) fact(L.editedAt, `${stamp(item.editedAt)}${item.versions.length > 1 ? ` · ${item.versions.length} ${L.edits}` : ''}`);
+  if (meta.duration) fact(L.duration, mmss(meta.duration));
+  if (meta.size) fact(L.size, bytes(meta.size));
+  if (meta.fileName) fact(L.file, meta.fileName);
+  if (meta.dim) fact(L.dim, meta.dim);
+  if (meta.forward) fact(L.forward, meta.forward);
+  if (meta.reply) fact(L.reply);
+  if (meta.viaBot) fact(L.viaBot, `@${meta.viaBot}`);
+  if (meta.album) fact(L.album);
+  if (meta.spoiler) fact(L.spoiler);
+  if (meta.links) fact(L.links, meta.links);
+  if (withName && item.username) fact('@', item.username);
+  card.append(facts);
+
+  if (item.hasFile && me.pro) {
+    const btn = h('button', { class: 'btn primary' }, h('i', { html: icon('send', 16) }), L.sendFile);
+    btn.onclick = async () => {
+      haptic('medium');
+      btn.disabled = true;
+      try { toast((await call('sendMedia', { id: item.id })).message); } catch (err) { tg.showAlert(err.message || L.error); }
+      btn.disabled = false;
+    };
+    card.append(btn);
+  } else if (item.hasFile) {
+    card.append(h('div', { class: 'lock' }, L.fileLocked));
+  }
+  return card;
+}
+
+// ============================================================================
+// Экран «Аналитика».
+// ============================================================================
+function bars(values, colors, labels) {
+  const max = Math.max(1, ...values.map((v) => v.reduce((a, b) => a + b, 0)));
+  const chart = h('div', { class: 'chart' }, values.map((parts) => h('div', { class: `col${parts.every((p) => !p) ? ' zero' : ''}` },
+    parts.map((p, i) => p > 0 && h('div', { class: `bar ${colors[i]}`, style: `height:${Math.max(4, (p / max) * 100)}%`, title: p })).reverse())));
+  return [chart, h('div', { class: 'axis' }, labels.map((l) => h('span', {}, l)))];
+}
+
+async function showStats() {
+  loading(4);
+  let data;
+  try { data = await call('stats', { tz: -new Date().getTimezoneOffset() }); } catch { return failed(showStats); }
+  if (tab !== 'stats') return;
+  remember(data);
+  const t = data.totals;
+  const share = t.saved ? Math.round((t.deleted / t.saved) * 100) : 0;
+  const kinds = Object.entries(data.kinds).sort((a, b) => b[1] - a[1]);
+  const kindMax = Math.max(1, ...kinds.map((k) => k[1]));
+  const topMax = Math.max(1, ...data.top.map((c) => c.deleted + c.edited));
+  const hasEvents = t.deleted + t.edited > 0;
+
+  view().replaceChildren(h('div', { class: 'fade' },
+    h('div', { class: 'tiles two' },
+      h('div', { class: 'tile' }, h('b', {}, num(t.chats)), h('span', {}, L.people)),
+      h('div', { class: 'tile violet' }, h('b', {}, num(t.saved)), h('span', {}, L.saved)),
+      h('div', { class: 'tile red' }, h('b', {}, num(t.deleted)), h('span', {}, `${L.deleted} · ${share}%`)),
+      h('div', { class: 'tile amber' }, h('b', {}, num(t.edited)), h('span', {}, L.edited))),
+    !hasEvents ? empty(L.noStats, L.noStatsHint, 'stats') : [
+      h('div', { class: 'section' }, L.byDay),
+      h('div', { class: 'card pad' },
+        bars(data.days.map((d) => [d.deleted, d.edited]), ['', 'amber'], data.days.map((d, i) => (i % 2 ? '' : new Date(d.day * 1000).getUTCDate()))),
+        h('div', { class: 'legend' }, h('span', {}, h('i', {}), L.deleted), h('span', {}, h('i', { class: 'amber' }), L.edited))),
+      h('div', { class: 'section' }, L.byHour),
+      h('div', { class: 'card pad' },
+        bars(data.hours.map((n) => [n]), ['violet'], data.hours.map((_, i) => (i % 6 ? '' : String(i).padStart(2, '0')))),
+        h('div', { class: 'hint', style: 'margin-top:8px' }, L.byHourHint)),
+      h('div', { class: 'section' }, L.speed),
+      h('div', { class: 'card' },
+        h('div', { class: 'kv' }, h('span', {}, L.median), h('b', {}, data.life.count ? span(data.life.median) : '—')),
+        h('div', { class: 'kv' }, h('span', {}, L.fastest), h('b', {}, data.life.count ? span(data.life.fastest) : '—')),
+        h('div', { class: 'kv' }, h('span', {}, L.sample), h('b', {}, num(data.life.count))),
+        h('div', { class: 'kv' }, h('span', {}, L.stored), h('b', {}, num(data.stored)))),
+      kinds.length > 0 && h('div', { class: 'section' }, L.byKind),
+      kinds.length > 0 && h('div', { class: 'card pad' }, kinds.map(([kind, n]) => h('div', { class: 'meter' },
+        h('div', { class: 'lbl' }, L.kinds[kind] || L.kinds.other),
+        h('div', { class: 'track' }, h('div', { class: 'fill', style: `width:${(n / kindMax) * 100}%` })),
+        h('div', { class: 'val' }, num(n))))),
+      data.top.length > 0 && h('div', { class: 'section' }, L.top),
+      data.top.length > 0 && h('div', { class: 'card pad' }, data.top.map((c) => h('div', { class: 'meter' },
+        h('div', { class: 'lbl' }, c.name || '?'),
+        h('div', { class: 'track' }, h('div', { class: 'fill', style: `width:${((c.deleted + c.edited) / topMax) * 100}%; background: linear-gradient(90deg, #f0731b, #e5484d)` })),
+        h('div', { class: 'val' }, num(c.deleted + c.edited))))),
+    ]));
+}
+
+// ============================================================================
+// Экран «Профиль»: тариф и настройки.
+// ============================================================================
+async function showMe() {
+  if (!me) { loading(3); try { remember(await call('chats')); } catch { return failed(showMe); } }
+  if (tab !== 'me') return;
+  const save = async (input) => { try { remember(await call('settings', input)); } catch { toast(L.error); } showMe(); };
+
+  const plan = me.pro
+    ? h('div', { class: 'plan pro' }, h('small', {}, L.planNow), h('h2', {}, '⭐️ Pro'), h('p', {}, fill(L.until, { date: fullDate(me.proUntil) })),
+      h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n: me.limit, d: me.proDays })))))
+    : h('div', { class: 'plan' }, h('small', {}, L.planNow), h('h2', {}, L.planFree), h('p', {}, fill(L.freeDesc, { d: me.freeDays })),
+      h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n: 100, d: me.proDays })))),
+      h('button', { class: 'btn', onclick: () => { haptic('medium'); tg.showAlert(L.buyHint, () => tg.close()); } }, fill(L.buy, { stars: me.stars })));
+
+  view().replaceChildren(h('div', { class: 'fade' },
+    plan,
+    h('div', { class: 'card' },
+      h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ notify: !me.notify }); } },
+        h('div', { class: `ic ${me.notify ? 'green' : 'amber'}`, html: icon(me.notify ? 'bell' : 'bellOff', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.notify), h('small', {}, me.notify ? L.notifyOn : L.notifyOff)),
+        h('div', { class: `switch${me.notify ? ' on' : ''}` })),
+      h('div', { class: 'opt' },
+        h('div', { class: 'ic violet', html: icon('globe', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.lang)),
+        h('div', { class: 'langs' }, [['ru', 'RU'], ['uz', 'UZ'], ['en', 'EN']].map(([code, label]) => h('button', {
+          class: code === lang ? 'on' : '', onclick: () => { haptic(); if (code !== lang) save({ lang: code }); },
+        }, label)))),
+      h('div', { class: 'opt' },
+        h('div', { class: `ic ${me.connected ? 'green' : 'red'}`, html: icon('link', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.connection), h('small', {}, me.connected ? L.connected : L.notConnected)))),
+    !me.connected && [h('div', { class: 'section' }, L.how), h('div', { class: 'card' }, h('ol', { class: 'steps' }, L.steps.map((s) => h('li', {}, s))))],
+    h('div', { class: 'card' },
+      h('button', { class: 'opt', onclick: () => tg.showConfirm(L.wipeAsk, (ok) => { if (ok) { chatsCache = []; save({ wipe: true }).then(() => toast(L.wiped)); } }) },
+        h('div', { class: 'ic red', html: icon('trash', 18) }),
+        h('div', { class: 'mid' }, h('div', { style: 'color:var(--red)' }, L.wipe), h('small', {}, L.wipeHint)))),
+    h('p', { class: 'hint', style: 'margin:12px 6px; text-align:center' }, L.privacy),
+  ));
+}
+
+// ============================================================================
+// Экран «Админ»: только для владельца бота (проверяется на сервере).
+// ============================================================================
+async function showAdmin(input = {}) {
+  if (!input.action) loading(4);
+  let data;
+  try { data = await call('admin', input); } catch { return failed(() => showAdmin()); }
+  if (tab !== 'admin') return;
+  remember(data);
+  const t = data.totals;
+
+  const userRow = (u) => h('button', { class: 'row', onclick: () => givePro(u) },
+    avatar(u.name || String(u.id), u.id),
+    h('div', { class: 'mid' },
+      h('div', { class: 'name' }, h('span', {}, u.name || `ID ${u.id}`)),
+      h('div', { class: 'sub' }, [u.username && `@${u.username}`, `ID ${u.id}`, u.lang.toUpperCase(), shortDate(u.created)].filter(Boolean).join(' · ')),
+      h('div', { class: 'sub' }, `${num(u.chats)} ${L.aChatsShort} · 🗑 ${num(u.deleted)} · ✏️ ${num(u.edited)}`)),
+    h('div', { class: 'pills' },
+      u.pro && h('span', { class: 'pill gold' }, 'PRO'),
+      h('span', { class: `pill ${u.connected ? 'green' : 'gray'}` }, u.connected ? L.aOn : L.aOffline)));
+
+  function givePro(u) {
+    haptic();
+    tg.showPopup({
+      title: fill(L.aGive, { name: u.name || u.id }),
+      message: fill(L.aGiveHint, { state: u.pro ? fill(L.until, { date: fullDate(u.proUntil) }) : L.aNoPro }),
+      buttons: [{ id: '30', type: 'default', text: L.a30 }, { id: '365', type: 'default', text: L.a365 }, u.pro ? { id: '0', type: 'destructive', text: L.aOff } : { id: 'x', type: 'cancel' }],
+    }, async (id) => {
+      if (!['30', '365', '0'].includes(id)) return;
+      await showAdmin({ action: 'pro', userId: u.id, days: Number(id) });
+      toast(L.aDone);
+    });
+  }
+
+  view().replaceChildren(h('div', { class: 'fade' },
+    h('div', { class: 'tiles two' },
+      h('div', { class: 'tile' }, h('b', {}, num(t.users)), h('span', {}, L.aUsers)),
+      h('div', { class: 'tile green' }, h('b', {}, num(t.conns)), h('span', {}, L.aConn)),
+      h('div', { class: 'tile amber' }, h('b', {}, num(t.pro)), h('span', {}, L.aPro)),
+      h('div', { class: 'tile violet' }, h('b', {}, `⭐️ ${num(t.stars)}`), h('span', {}, L.aStars))),
+    h('div', { class: 'tiles' },
+      h('div', { class: 'tile' }, h('b', {}, num(t.chats)), h('span', {}, L.aChats)),
+      h('div', { class: 'tile red' }, h('b', {}, num(t.deleted)), h('span', {}, L.aDeleted)),
+      h('div', { class: 'tile amber' }, h('b', {}, num(t.edited)), h('span', {}, L.aEdited))),
+    h('div', { class: 'section' }, L.aNew),
+    h('div', { class: 'card pad' }, bars(data.days.map((d) => [d.users]), ['blue'], data.days.map((d, i) => (i % 2 ? '' : new Date(d.day * 1000).getUTCDate())))),
+    h('div', { class: 'section' }, `${L.aList} · ${num(t.users)}`),
+    h('div', { class: 'card' }, data.users.map(userRow)),
+    h('div', { class: 'section' }, L.aPays),
+    h('div', { class: 'card' }, data.payments.length
+      ? data.payments.map((p) => h('div', { class: 'kv' }, h('span', {}, `ID ${p.userId} · ${stamp(p.at)}`), h('b', {}, `⭐️ ${num(p.stars)}`)))
+      : h('div', { class: 'pad hint' }, L.aNoPays)),
+    h('div', { class: 'card' }, h('div', { class: 'kv' }, h('span', {}, L.aMsgs), h('b', {}, num(t.msgs)))),
+    h('p', { class: 'hint', style: 'margin:12px 6px; text-align:center' }, L.aNote),
+  ));
+}
+
+go('chats');
 </script>
 </body>
 </html>

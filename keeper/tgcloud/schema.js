@@ -9,6 +9,9 @@ export const users = table('users', {
   id:       integer('id').primaryKey(),               // Telegram ID
   lang:     text('lang').notNull().default('en'),     // 'ru' | 'uz' | 'en'
   proUntil: integer('pro_until').notNull().default(0), // до какого времени оплачен Pro
+  name:     text('name').notNull().default(''),       // имя из Telegram (для админ-панели)
+  username: text('username').notNull().default(''),
+  notify:   integer('notify').notNull().default(1),   // 1 — присылать уведомления в чат, 0 — только история в приложении
   created:  integer('created_at').notNull().default(0),
 });
 
@@ -31,6 +34,9 @@ export const messages = table('messages', {
   chatId:    integer('chat_id').notNull(),
   messageId: integer('message_id').notNull(),
   fromName:  text('from_name').notNull(),
+  fromId:    integer('from_id'),                      // Telegram ID отправителя
+  username:  text('username'),                        // его @username, если есть
+  meta:      text('meta'),                            // подробности в формате JSON: размер файла, длительность, пересылка…
   date:      integer('date').notNull(),
   kind:      text('kind').notNull(),                  // 'text' | 'photo' | 'video' | ...
   text:      text('text').notNull().default(''),      // текст или подпись к медиа
@@ -42,6 +48,25 @@ export const messages = table('messages', {
   byOwnerDeleted: index('idx_messages_owner_deleted').on(t.ownerId, t.deletedAt),
   byOwnerEdited: index('idx_messages_owner_edited').on(t.ownerId, t.editedAt),
   byDate: index('idx_messages_date').on(t.date),
+}));
+
+// Чаты пользователя: по одной строке на собеседника. Счётчики копятся за всё время,
+// даже когда сами сообщения уже стёрты по сроку хранения.
+export const chats = table('chats', {
+  id:       integer('id').primaryKey({ autoIncrement: true }),
+  ownerId:  integer('owner_id').notNull(),
+  chatId:   integer('chat_id').notNull(),             // Telegram ID собеседника
+  name:     text('name').notNull().default(''),
+  username: text('username').notNull().default(''),
+  saved:    integer('saved').notNull().default(0),    // сколько сообщений собеседника увидел бот
+  deleted:  integer('deleted').notNull().default(0),  // сколько из них удалено
+  edited:   integer('edited').notNull().default(0),   // сколько правок
+  muted:    integer('muted').notNull().default(0),    // 1 — не присылать уведомления по этому чату
+  firstAt:  integer('first_at').notNull().default(0),
+  lastAt:   integer('last_at').notNull().default(0),  // последнее сообщение
+  eventAt:  integer('event_at').notNull().default(0), // последнее удаление или правка
+}, (t) => ({
+  oneChat: uniqueIndex('uidx_chats_key').on(t.ownerId, t.chatId),
 }));
 
 // История правок: что было в сообщении до изменения.

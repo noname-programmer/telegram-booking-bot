@@ -19,6 +19,10 @@ const T = {
     btnPro: '⭐️ Pro',
     btnLang: '🌐 Язык',
     btnPrivacy: '🔒 Мои данные',
+    btnNotifyOn: '🔔 Уведомления: вкл',
+    btnNotifyOff: '🔕 Уведомления: выкл',
+    notifyOn: '🔔 Уведомления приходят в этот чат.',
+    notifyOff: '🔕 Тихий режим: в чат ничего не приходит, всё собирается в «Истории».',
     connected: '✅ Подключено! Теперь я буду присылать сюда сообщения, которые собеседники удалят или изменят.',
     disconnected: '⚪️ Бот отключён от аккаунта. Сохранённые сообщения удалены.',
     deleted: '🗑 <b>{name}</b> удалил(а) сообщение:',
@@ -39,7 +43,7 @@ const T = {
     proThanks: '🎉 Pro включён до {date}. Спасибо!',
     chooseLang: 'Выберите язык:',
     langSet: 'Готово, язык: Русский.',
-    privacy: '🔒 <b>Ваши данные</b>\n\nБот хранит сообщения собеседников из ваших личных чатов: текст, время и ссылку на файл. '
+    privacy: '🔒 <b>Ваши данные</b>\n\nБот хранит сообщения собеседников из ваших личных чатов: текст, время, имя отправителя и ссылку на файл; по каждому собеседнику ведётся счётчик удалений и правок. '
       + 'Свои сообщения и защищённый от копирования контент не сохраняются. Срок хранения: {freeDays} дн. бесплатно, {proDays} дн. в Pro, потом записи стираются. '
       + 'При отключении бота всё удаляется сразу.',
     btnWipe: '🗑 Удалить всё сейчас',
@@ -66,6 +70,10 @@ const T = {
     btnPro: '⭐️ Pro',
     btnLang: '🌐 Til',
     btnPrivacy: "🔒 Ma'lumotlarim",
+    btnNotifyOn: '🔔 Bildirishnomalar: yoqilgan',
+    btnNotifyOff: "🔕 Bildirishnomalar: o'chirilgan",
+    notifyOn: '🔔 Bildirishnomalar shu chatga keladi.',
+    notifyOff: "🔕 Jim rejim: chatga hech narsa kelmaydi, hammasi «Tarix»da yig'iladi.",
     connected: "✅ Ulandi! Endi suhbatdoshlar o'chirgan yoki o'zgartirgan xabarlarni shu yerga yuboraman.",
     disconnected: "⚪️ Bot akkauntdan uzildi. Saqlangan xabarlar o'chirildi.",
     deleted: "🗑 <b>{name}</b> xabarni o'chirdi:",
@@ -86,7 +94,7 @@ const T = {
     proThanks: '🎉 Pro {date} gacha yoqildi. Rahmat!',
     chooseLang: 'Tilni tanlang:',
     langSet: "Tayyor, til: O'zbekcha.",
-    privacy: "🔒 <b>Ma'lumotlaringiz</b>\n\nBot shaxsiy chatlaringizdagi suhbatdoshlar xabarlarini saqlaydi: matn, vaqt va fayl havolasi. "
+    privacy: "🔒 <b>Ma'lumotlaringiz</b>\n\nBot shaxsiy chatlaringizdagi suhbatdoshlar xabarlarini saqlaydi: matn, vaqt, yuboruvchi ismi va fayl havolasi; har bir suhbatdosh bo'yicha o'chirish va tahrirlar soni yuritiladi. "
       + "O'z xabarlaringiz va nusxalashdan himoyalangan kontent saqlanmaydi. Saqlash muddati: bepul {freeDays} kun, Pro {proDays} kun, keyin yozuvlar o'chiriladi. "
       + "Bot uzilganda hammasi darhol o'chiriladi.",
     btnWipe: "🗑 Hozir hammasini o'chirish",
@@ -113,6 +121,10 @@ const T = {
     btnPro: '⭐️ Pro',
     btnLang: '🌐 Language',
     btnPrivacy: '🔒 My data',
+    btnNotifyOn: '🔔 Notifications: on',
+    btnNotifyOff: '🔕 Notifications: off',
+    notifyOn: '🔔 Notifications arrive in this chat.',
+    notifyOff: '🔕 Quiet mode: nothing is sent to the chat, everything is collected in “History”.',
     connected: '✅ Connected! I will now send you messages that people delete or edit.',
     disconnected: '⚪️ The bot was disconnected. Saved messages have been deleted.',
     deleted: '🗑 <b>{name}</b> deleted a message:',
@@ -133,7 +145,7 @@ const T = {
     proThanks: '🎉 Pro is on until {date}. Thank you!',
     chooseLang: 'Choose a language:',
     langSet: 'Done, language: English.',
-    privacy: '🔒 <b>Your data</b>\n\nThe bot stores messages from the people you chat with privately: text, time and a file reference. '
+    privacy: '🔒 <b>Your data</b>\n\nThe bot stores messages from the people you chat with privately: text, time, the sender’s name and a file reference; for each person it keeps a count of deletions and edits. '
       + 'Your own messages and copy-protected content are not saved. Storage time: {freeDays} days on the free plan, {proDays} days with Pro, then records are erased. '
       + 'When you disconnect the bot, everything is deleted at once.',
     btnWipe: '🗑 Delete everything now',

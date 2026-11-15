@@ -186,5 +186,10 @@ The platform manages the bot's webhook for you, derived from your deployed
 - It has no standalone runtime and no example configs. Its scenarios are `test/keeper.js` (`cd test && npm run keeper`,
   also part of `npm test`); the test builds tables straight from `keeper/tgcloud/schema.js`.
 - All texts live in `keeper/tgcloud/lib/i18n.js` in three languages (ru, uz, en); a test fails if a key is missing in one.
+- Mini App endpoints: `chats`, `feed`, `stats`, `settings`, `sendMedia`, `admin`. Each starts with `whoami(ctx)` from
+  `lib/app.js`; `admin` must call `requireAdmin` and must never return message text. The Mini App is one hand-written file,
+  `keeper/miniapp/index.html` (three languages inside, all user text inserted as text, never as HTML).
+- A user can turn notifications off (`users.notify`) or mute one chat (`chats.muted`): handlers still save and count
+  everything, they only skip the message to the owner.
 - It never stores the owner's own messages or protected content, and has no code to capture self-destructing media.
   Keep it that way.

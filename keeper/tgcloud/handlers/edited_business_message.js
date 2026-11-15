@@ -1,7 +1,7 @@
 // handlers/edited_business_message.js — собеседник изменил сообщение.
 
 import { ownerOf } from '../lib/business.js';
-import { findMessage, recordEdit, saveMessage } from '../lib/store.js';
+import { findMessage, recordEdit, saveMessage, countEvent, getChat } from '../lib/store.js';
 import { notifyEdited } from '../lib/ui.js';
 
 export default async function onEditedBusinessMessage(message) {
@@ -15,5 +15,8 @@ export default async function onEditedBusinessMessage(message) {
   if (!before) return saveMessage(conn, message);
 
   const after = await recordEdit(before, message);
-  if (after) await notifyEdited(user, conn.userChatId, before, after);
+  if (!after) return;
+  await countEvent(conn.userId, message.chat.id, 'edited');
+  if (!user.notify || (await getChat(conn.userId, message.chat.id))?.muted) return;
+  await notifyEdited(user, conn.userChatId, before, after);
 }

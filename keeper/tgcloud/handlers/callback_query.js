@@ -2,7 +2,7 @@
 
 import { api, BotApiError } from 'sdk';
 import { t, LANGS } from '../lib/i18n.js';
-import { getUser, setLang, wipeUser } from '../lib/store.js';
+import { getUser, setLang, setNotify, wipeUser } from '../lib/store.js';
 import { send, menu, proScreen, langKeyboard, privacyScreen, wipeConfirm } from '../lib/ui.js';
 
 export default async function onCallback(query) {
@@ -21,6 +21,14 @@ export default async function onCallback(query) {
     user.lang = data.slice(5);
     await setLang(user.id, user.lang);
     toast = t(user.lang, 'langSet');
+    const me = await api.getMe();
+    const { text, ...extra } = await menu(user, me.username);
+    await send(chatId, text, extra);
+  } else if (data === 'notify') {
+    // Переключатель: присылать уведомления в чат или молча складывать в мини-приложение.
+    user.notify = user.notify ? 0 : 1;
+    await setNotify(user.id, user.notify);
+    toast = t(lang, user.notify ? 'notifyOn' : 'notifyOff');
     const me = await api.getMe();
     const { text, ...extra } = await menu(user, me.username);
     await send(chatId, text, extra);

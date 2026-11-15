@@ -2,8 +2,8 @@
 // Обработчики (handlers) и endpoints не пишут запросы сами, а вызывают функции отсюда.
 
 import { db } from 'sdk';
-import { eq, and, asc, desc, inArray, isNotNull, sql } from 'sdk/db';
-import { users, connections, messages, edits, payments } from '../schema.js';
+import { eq, and, or, asc, desc, inArray, isNotNull, sql } from 'sdk/db';
+import { users, connections, chats, messages, edits, payments } from '../schema.js';
 import { LIMITS } from './config.js';
 import { pickLang } from './i18n.js';
 
@@ -13,10 +13,22 @@ const DAY = 24 * 60 * 60;
 // ---------- пользователи ----------
 
 // Находит пользователя или создаёт нового (язык берём из его Telegram).
+// Заодно обновляет имя и @username, если они поменялись.
 export async function getUser(tgUser) {
+  const name = displayName(tgUser);
+  const username = tgUser.username ?? '';
   const found = await db.select().from(users).where(eq(users.id, tgUser.id)).get();
-  if (found) return found;
-  const row = { id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0, created: now() };
+  if (found) {
+    if (tgUser.first_name && (found.name !== name || found.username !== username)) {
+      await db.update(users).set({ name, username }).where(eq(users.id, tgUser.id)).run();
+      Object.assign(found, { name, username });
+    }
+    return found;
+  }
+  const row = {
+    id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0,
+    name: tgUser.first_name ? name : '', username, notify: 1, created: now(),
+  };
   await db.insert(users).values(row).onConflictDoNothing({ target: users.id }).run();
   return row;
 }
@@ -25,6 +37,10 @@ export const isPro = (user) => user.proUntil > now();
 
 export async function setLang(userId, lang) {
   await db.update(users).set({ lang }).where(eq(users.id, userId)).run();
+}
+
+export async function setNotify(userId, on) {
+  await db.update(users).set({ notify: on ? 1 : 0 }).where(eq(users.id, userId)).run();
 }
 
 // Записывает оплату и включает Pro. Повторное уведомление о том же платеже ничего не меняет.
@@ -73,7 +89,45 @@ export function describe(m) {
   for (const kind of MEDIA) {
     if (m[kind]?.file_id) return { kind, text, fileId: m[kind].file_id };
   }
+  // Контакт, точка на карте, опрос: файла нет, но суть можно записать текстом.
+  if (m.contact) return { kind: 'other', text: [m.contact.first_name, m.contact.last_name, m.contact.phone_number].filter(Boolean).join(' '), fileId: null };
+  if (m.venue) return { kind: 'other', text: [m.venue.title, m.venue.address].filter(Boolean).join(', '), fileId: null };
+  if (m.location) return { kind: 'other', text: `${m.location.latitude}, ${m.location.longitude}`, fileId: null };
+  if (m.poll) return { kind: 'other', text: m.poll.question ?? '', fileId: null };
+  if (m.dice) return { kind: 'other', text: `${m.dice.emoji ?? ''} ${m.dice.value ?? ''}`.trim(), fileId: null };
   return { kind: 'other', text, fileId: null };
+}
+
+// Подробности о сообщении для мини-приложения: размер и длительность файла, пересылка и т. п.
+// Возвращает строку JSON или null, если добавить нечего.
+export function details(m) {
+  const meta = {};
+  const file = (Array.isArray(m.photo) && m.photo.at(-1)) || m.animation || MEDIA.map((k) => m[k]).find(Boolean);
+  if (file) {
+    if (file.file_size) meta.size = file.file_size;
+    if (file.duration) meta.duration = file.duration;
+    if (file.file_name) meta.fileName = String(file.file_name).slice(0, 120);
+    if (file.mime_type) meta.mime = file.mime_type;
+    if (file.width && file.height) meta.dim = `${file.width}×${file.height}`;
+    if (file.emoji) meta.emoji = file.emoji;
+    if (file.title || file.performer) meta.title = [file.performer, file.title].filter(Boolean).join(' — ').slice(0, 120);
+  }
+  const origin = m.forward_origin;
+  if (origin) {
+    meta.forward = displayName(origin.sender_user ?? origin.chat ?? origin.sender_chat)
+      .replace(/^\?$/, '') || origin.sender_user_name || '?';
+  }
+  if (m.reply_to_message) meta.reply = true; // сам текст, на который ответили, не храним: он может быть вашим
+  if (m.via_bot?.username) meta.viaBot = m.via_bot.username;
+  if (m.media_group_id) meta.album = true;
+  if (m.has_media_spoiler) meta.spoiler = true;
+  if (m.contact) meta.type = 'contact';
+  else if (m.venue || m.location) meta.type = 'location';
+  else if (m.poll) meta.type = 'poll';
+  else if (m.dice) meta.type = 'dice';
+  const links = (m.entities ?? m.caption_entities ?? []).filter((e) => e.type === 'url' || e.type === 'text_link').length;
+  if (links) meta.links = links;
+  return Object.keys(meta).length ? JSON.stringify(meta) : null;
 }
 
 export const displayName = (u) => [u?.first_name, u?.last_name].filter(Boolean).join(' ') || u?.title || '?';
@@ -84,8 +138,48 @@ export async function saveMessage(conn, m) {
   const d = describe(m);
   await db.insert(messages).values({
     connId: conn.id, ownerId: conn.userId, chatId: m.chat.id, messageId: m.message_id,
-    fromName: displayName(m.from ?? m.chat), date: m.date ?? now(), ...d,
+    fromName: displayName(m.from ?? m.chat), fromId: m.from?.id ?? null, username: m.from?.username ?? null,
+    date: m.date ?? now(), ...d, meta: details(m),
   }).onConflictDoNothing().run();
+}
+
+// ---------- чаты (собеседники) ----------
+
+export async function getChat(ownerId, chatId) {
+  return db.select().from(chats).where(and(eq(chats.ownerId, ownerId), eq(chats.chatId, chatId))).get();
+}
+
+// Отмечает новое сообщение в чате: создаёт строку собеседника, если её нет, и обновляет имя и счётчик.
+export async function touchChat(ownerId, chat, date) {
+  const at = date ?? now();
+  const name = displayName(chat);
+  const username = chat.username ?? '';
+  if (!(await getChat(ownerId, chat.id))) {
+    await db.insert(chats).values({ ownerId, chatId: chat.id, name, username, firstAt: at, lastAt: at })
+      .onConflictDoNothing().run();
+  }
+  await db.run(sql`update chats set saved = saved + 1, name = ${name}, username = ${username}, last_at = ${at}
+    where owner_id = ${ownerId} and chat_id = ${chat.id}`);
+}
+
+// Прибавляет к счётчику чата удаления или правки. field: 'deleted' | 'edited'.
+export async function countEvent(ownerId, chatId, field, n = 1) {
+  const at = now();
+  if (field === 'deleted') {
+    await db.run(sql`update chats set deleted = deleted + ${n}, event_at = ${at} where owner_id = ${ownerId} and chat_id = ${chatId}`);
+  } else {
+    await db.run(sql`update chats set edited = edited + ${n}, event_at = ${at} where owner_id = ${ownerId} and chat_id = ${chatId}`);
+  }
+}
+
+export async function setMuted(ownerId, chatId, muted) {
+  await db.update(chats).set({ muted: muted ? 1 : 0 }).where(and(eq(chats.ownerId, ownerId), eq(chats.chatId, chatId))).run();
+}
+
+// Список собеседников: сначала те, у кого недавно что-то удалили или изменили.
+export async function listChats(ownerId) {
+  const rows = await db.select().from(chats).where(eq(chats.ownerId, ownerId)).all();
+  return rows.sort((a, b) => (b.eventAt - a.eventAt) || (b.lastAt - a.lastAt)).slice(0, 300);
 }
 
 export async function findMessage(connId, chatId, messageId) {
@@ -112,21 +206,38 @@ export async function recordEdit(row, m) {
   if (d.text === row.text && d.fileId === row.fileId) return false;
   const at = now();
   await db.insert(edits).values({ msgId: row.id, ownerId: row.ownerId, oldText: row.text, at }).run();
-  await db.update(messages).set({ ...d, editedAt: at }).where(eq(messages.id, row.id)).run();
+  await db.update(messages).set({ ...d, meta: details(m), editedAt: at }).where(eq(messages.id, row.id)).run();
   return d;
 }
 
 // ---------- история для мини-приложения ----------
 
-export async function feed(ownerId, type, limit) {
-  const col = type === 'edited' ? messages.editedAt : messages.deletedAt;
-  const rows = await db.select().from(messages)
-    .where(and(eq(messages.ownerId, ownerId), isNotNull(col)))
-    .orderBy(desc(col)).limit(limit).all();
-  if (type !== 'edited' || !rows.length) return rows.map((r) => ({ ...r, versions: [] }));
-  const history = await db.select().from(edits)
-    .where(inArray(edits.msgId, rows.map((r) => r.id))).orderBy(asc(edits.id)).all();
-  return rows.map((r) => ({ ...r, versions: history.filter((e) => e.msgId === r.id).map((e) => e.oldText) }));
+// type: 'deleted' | 'edited' | 'all'; chatId — только один собеседник (или null — все).
+export async function feed(ownerId, { type = 'all', chatId = null, limit }) {
+  const base = [eq(messages.ownerId, ownerId)];
+  if (chatId !== null) base.push(eq(messages.chatId, chatId));
+  const pick = (col) => db.select().from(messages).where(and(...base, isNotNull(col))).orderBy(desc(col)).limit(limit).all();
+  const eventAt = (r) => Math.max(r.deletedAt ?? 0, r.editedAt ?? 0);
+
+  let rows;
+  if (type === 'deleted') rows = await pick(messages.deletedAt);
+  else if (type === 'edited') rows = await pick(messages.editedAt);
+  else {
+    // Сообщение могли и изменить, и удалить — в общей ленте показываем его один раз.
+    const byId = new Map();
+    for (const r of [...await pick(messages.deletedAt), ...await pick(messages.editedAt)]) byId.set(r.id, r);
+    rows = [...byId.values()].sort((a, b) => eventAt(b) - eventAt(a)).slice(0, limit);
+  }
+
+  const changed = rows.filter((r) => r.editedAt).map((r) => r.id);
+  const history = changed.length
+    ? await db.select().from(edits).where(inArray(edits.msgId, changed)).orderBy(asc(edits.id)).all()
+    : [];
+  return rows.map((r) => ({
+    ...r,
+    at: type === 'deleted' ? r.deletedAt : type === 'edited' ? r.editedAt : eventAt(r),
+    versions: history.filter((e) => e.msgId === r.id).map((e) => ({ text: e.oldText, at: e.at })),
+  }));
 }
 
 export async function getOwnMessage(ownerId, id) {
@@ -139,6 +250,7 @@ export async function getOwnMessage(ownerId, id) {
 export async function wipeUser(ownerId) {
   await db.delete(edits).where(eq(edits.ownerId, ownerId)).run();
   await db.delete(messages).where(eq(messages.ownerId, ownerId)).run();
+  await db.delete(chats).where(eq(chats.ownerId, ownerId)).run();
 }
 
 // Стирает устаревшие записи: у бесплатных — старше freeDays, у всех — старше proDays.
@@ -164,4 +276,103 @@ export async function stats() {
     msgs: await one(sql`select count(*) as n from messages`),
     stars: await one(sql`select coalesce(sum(stars), 0) as n from payments`),
   };
+}
+
+// ---------- аналитика пользователя ----------
+
+const median = (list) => {
+  if (!list.length) return 0;
+  const sorted = [...list].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+};
+
+// tz — смещение часового пояса пользователя в минутах (у Ташкента +300), чтобы часы и дни были местными.
+export async function analytics(ownerId, tz = 0) {
+  const shift = Math.max(-840, Math.min(840, Number(tz) || 0)) * 60;
+  const t = now();
+  const list = await db.select().from(chats).where(eq(chats.ownerId, ownerId)).all();
+  const totals = { chats: list.length, saved: 0, deleted: 0, edited: 0 };
+  for (const c of list) { totals.saved += c.saved; totals.deleted += c.deleted; totals.edited += c.edited; }
+
+  const rows = await db.select({
+    date: messages.date, deletedAt: messages.deletedAt, editedAt: messages.editedAt, kind: messages.kind,
+  }).from(messages)
+    .where(and(eq(messages.ownerId, ownerId), or(isNotNull(messages.deletedAt), isNotNull(messages.editedAt))))
+    .limit(5000).all();
+
+  // Последние 14 дней по местному времени.
+  const dayOf = (unix) => Math.floor((unix + shift) / DAY);
+  const today = dayOf(t);
+  const days = Array.from({ length: 14 }, (_, i) => ({ day: (today - 13 + i) * DAY, deleted: 0, edited: 0 }));
+  const hours = Array(24).fill(0);
+  const kinds = {};
+  const life = [];
+  for (const r of rows) {
+    if (r.deletedAt) {
+      const i = dayOf(r.deletedAt) - (today - 13);
+      if (i >= 0 && i < 14) days[i].deleted++;
+      hours[Math.floor(((r.deletedAt + shift) % DAY + DAY) % DAY / 3600)]++;
+      kinds[r.kind] = (kinds[r.kind] ?? 0) + 1;
+      if (r.deletedAt >= r.date) life.push(r.deletedAt - r.date);
+    }
+    if (r.editedAt) {
+      const i = dayOf(r.editedAt) - (today - 13);
+      if (i >= 0 && i < 14) days[i].edited++;
+    }
+  }
+  const top = [...list].sort((a, b) => (b.deleted + b.edited) - (a.deleted + a.edited))
+    .filter((c) => c.deleted + c.edited > 0).slice(0, 5)
+    .map((c) => ({ chatId: c.chatId, name: c.name, username: c.username, saved: c.saved, deleted: c.deleted, edited: c.edited }));
+  return {
+    totals, days, hours, kinds, top,
+    stored: await db.$count(messages, eq(messages.ownerId, ownerId)),
+    life: { count: life.length, median: median(life), fastest: life.length ? Math.min(...life) : 0 },
+  };
+}
+
+// ---------- админ-панель ----------
+// Здесь только цифры и список пользователей. Тексты чужих сообщений админ не видит.
+
+export async function adminOverview() {
+  const t = now();
+  const one = async (q) => Number((await db.get(q))?.n ?? 0);
+  const totals = {
+    ...(await stats()),
+    chats: await one(sql`select count(*) as n from chats`),
+    deleted: await one(sql`select coalesce(sum(deleted), 0) as n from chats`),
+    edited: await one(sql`select coalesce(sum(edited), 0) as n from chats`),
+    payments: await one(sql`select count(*) as n from payments`),
+  };
+  const today = Math.floor(t / DAY);
+  const days = Array.from({ length: 14 }, (_, i) => ({ day: (today - 13 + i) * DAY, users: 0 }));
+  const all = await db.select().from(users).orderBy(desc(users.created)).limit(1000).all();
+  for (const u of all) {
+    const i = Math.floor(u.created / DAY) - (today - 13);
+    if (i >= 0 && i < 14) days[i].users++;
+  }
+  const active = new Set((await db.select().from(connections).where(eq(connections.enabled, 1)).all()).map((c) => c.userId));
+  const usage = new Map();
+  for (const c of await db.select().from(chats).limit(20000).all()) {
+    const u = usage.get(c.ownerId) ?? { chats: 0, saved: 0, deleted: 0, edited: 0 };
+    u.chats++; u.saved += c.saved; u.deleted += c.deleted; u.edited += c.edited;
+    usage.set(c.ownerId, u);
+  }
+  return {
+    totals, days,
+    users: all.slice(0, 100).map((u) => ({
+      id: u.id, name: u.name, username: u.username, lang: u.lang, created: u.created,
+      proUntil: u.proUntil, pro: u.proUntil > t, connected: active.has(u.id),
+      ...(usage.get(u.id) ?? { chats: 0, saved: 0, deleted: 0, edited: 0 }),
+    })),
+    payments: await db.select().from(payments).orderBy(desc(payments.at)).limit(30).all(),
+  };
+}
+
+// Подарить Pro на days дней (прибавляется к уже оплаченному) или снять его (days = 0).
+export async function adminSetPro(userId, days) {
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user) return null;
+  const proUntil = days > 0 ? Math.max(now(), user.proUntil) + Math.floor(days) * DAY : 0;
+  await db.update(users).set({ proUntil }).where(eq(users.id, userId)).run();
+  return { ...user, proUntil };
 }
