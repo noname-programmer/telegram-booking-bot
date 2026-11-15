@@ -126,6 +126,15 @@ await step('Собеседник удалил текст → владелец п
   assert.match(out[0].params.text, /удали &lt;b&gt;меня&lt;\/b&gt;/); // текст экранирован
 });
 
+await step('Повторное событие об удалении → второго уведомления нет', async () => {
+  const m = biz({ text: 'один раз' });
+  await onBizMessage(m);
+  await del([m.message_id]);
+  assert.equal(sent(take()).length, 1);
+  await del([m.message_id]);
+  assert.equal(take().length, 0);
+});
+
 await step('Удаление неизвестного сообщения → тишина', async () => {
   await del([999999]);
   assert.equal(take().length, 0);
@@ -140,6 +149,21 @@ await step('Собеседник изменил текст → «было / ст
   assert.match(text, /приду в 7/);
   await onBizEdited({ ...m, text: 'приду в 7' }); // то же самое ещё раз — ничего не шлём
   assert.equal(take().length, 0);
+});
+
+await step('Изменили очень длинное сообщение → уведомление помещается в лимит Telegram', async () => {
+  const m = biz({ text: '😀&'.repeat(2000) });
+  await onBizMessage(m);
+  await onBizEdited({ ...m, text: '<я>'.repeat(1400) });
+  const out = sent(take());
+  assert.equal(out.length, 1);
+  // Telegram считает длину после разбора разметки: &amp; — это один знак, теги не считаются.
+  const plain = out[0].params.text.replace(/<[^>]+>/g, '').replace(/&(amp|lt|gt);/g, '&');
+  assert.ok(plain.length <= 4096, `длина ${plain.length}`);
+  assert.doesNotMatch(out[0].params.text, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/); // эмодзи не разорван
+  // Убираем за собой, чтобы длинная запись не мешала следующим проверкам истории.
+  sqlite.prepare('delete from edits where msg_id in (select id from messages where message_id = ?)').run(m.message_id);
+  sqlite.prepare('delete from messages where message_id = ?').run(m.message_id);
 });
 
 await step('Без Pro: удалённое фото — только подпись и подсказка про Pro', async () => {

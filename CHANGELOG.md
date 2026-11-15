@@ -10,6 +10,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `keeper/`: a second, separate bot. It connects through Telegram Business and shows the user messages
   that the other person deleted or edited; Mini App with history, Pro subscription paid in Telegram Stars,
   Russian / Uzbek / English. Scenarios in `test/keeper.js`.
+  Deployed to @keepXsavebot; a long edited message no longer exceeds Telegram's 4096-character limit, and a repeated
+  "deleted" event no longer notifies twice.
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).

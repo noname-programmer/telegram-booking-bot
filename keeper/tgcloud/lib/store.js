@@ -94,11 +94,15 @@ export async function findMessage(connId, chatId, messageId) {
 }
 
 // Помечает сообщения удалёнными и возвращает те, что были у нас сохранены.
+// Уже помеченные пропускаем: Telegram может прислать одно событие дважды, а уведомление нужно одно.
 export async function markDeleted(connId, chatId, ids) {
   if (!ids.length) return [];
   const where = and(eq(messages.connId, connId), eq(messages.chatId, chatId), inArray(messages.messageId, ids));
-  const rows = await db.select().from(messages).where(where).orderBy(asc(messages.messageId)).all();
-  if (rows.length) await db.update(messages).set({ deletedAt: now() }).where(where).run();
+  const all = await db.select().from(messages).where(where).orderBy(asc(messages.messageId)).all();
+  const rows = all.filter((r) => r.deletedAt === null || r.deletedAt === undefined);
+  if (rows.length) {
+    await db.update(messages).set({ deletedAt: now() }).where(inArray(messages.id, rows.map((r) => r.id))).run();
+  }
   return rows;
 }
 

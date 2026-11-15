@@ -10,8 +10,10 @@ import { isPro, hasActiveConnection } from './store.js';
 // Экранирует текст пользователя, чтобы он не сломал HTML-разметку.
 export const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const cut = (s) => (s.length > LIMITS.textMax ? `${s.slice(0, LIMITS.textMax)}…` : s);
-const quote = (s) => `<blockquote>${esc(cut(s))}</blockquote>`;
+// Обрезает слишком длинный текст. Эмодзи занимает два «знака» подряд: если разрез попал
+// между ними, убираем оставшуюся половинку, иначе Telegram не примет сообщение.
+const cut = (s, max) => (s.length > max ? `${s.slice(0, max).replace(/[\uD800-\uDBFF]$/, '')}…` : s);
+const quote = (s, max) => `<blockquote>${esc(cut(s, max))}</blockquote>`;
 
 export const fmtDate = (unix) => new Date(unix * 1000).toISOString().slice(0, 10);
 
@@ -102,10 +104,10 @@ export async function sendMedia(chatId, row) {
 }
 
 // Текст о сообщении: вид (если это не просто текст) и содержимое.
-function body(lang, row) {
+function body(lang, row, max = LIMITS.textMax) {
   const parts = [];
   if (row.kind !== 'text') parts.push(t(lang, `kind_${row.kind}`));
-  if (row.text) parts.push(quote(row.text));
+  if (row.text) parts.push(quote(row.text, max));
   return parts.join('\n');
 }
 
@@ -120,9 +122,11 @@ export async function notifyDeleted(user, chatId, row) {
 
 export async function notifyEdited(user, chatId, before, after) {
   const lang = user.lang;
+  // В одном сообщении два текста («было» и «стало»), а лимит Telegram — 4096 знаков на всё сообщение.
+  const half = Math.floor(LIMITS.textMax / 2);
   await send(chatId, [
     t(lang, 'edited', { name: esc(before.fromName) }),
-    `<b>${t(lang, 'was')}</b>`, body(lang, before) || '—',
-    `<b>${t(lang, 'now')}</b>`, body(lang, { ...before, ...after }) || '—',
+    `<b>${t(lang, 'was')}</b>`, body(lang, before, half) || '—',
+    `<b>${t(lang, 'now')}</b>`, body(lang, { ...before, ...after }, half) || '—',
   ].join('\n'));
 }
