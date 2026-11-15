@@ -289,6 +289,36 @@
                   background: linear-gradient(transparent, rgba(0, 0, 0, .7)); }
   .viewer .foot p { margin: 0 0 10px; font-size: 14px; max-height: 4.2em; overflow: auto; white-space: pre-wrap; }
   .viewer .foot .btn { width: 100%; background: rgba(255, 255, 255, .16); color: #fff; }
+  .seg.scroll { overflow-x: auto; scrollbar-width: none; } .seg.scroll::-webkit-scrollbar { display: none; }
+  .seg.scroll button { flex: none; padding: 8px 13px; white-space: nowrap; }
+  .star { margin-left: 2px; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 17px; color: var(--hint); flex: none; }
+  .star.on { color: #f7b500; }
+  /* ---------- галерея ---------- */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; border-radius: 16px; overflow: hidden; }
+  .cell { position: relative; aspect-ratio: 1; background: var(--card); overflow: hidden; display: grid; place-items: center; color: var(--hint); }
+  .cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cell .who { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 4px; font-size: 10.5px; font-weight: 650; color: #fff; text-align: left;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(transparent, rgba(0, 0, 0, .7)); }
+  .cell .dur { position: absolute; top: 5px; right: 5px; font-size: 10.5px; font-weight: 700; color: #fff; background: rgba(0, 0, 0, .6); padding: 1px 6px; border-radius: 6px; }
+  /* ---------- экран PIN-кода ---------- */
+  .lock-screen { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center;
+                 padding: 24px 24px calc(24px + var(--safe-b)); animation: fade .15s; }
+  .lock-screen .logo { width: 62px; height: 62px; border-radius: 20px; margin-bottom: 16px; }
+  .lock-screen h2 { margin: 0 0 4px; font-size: 20px; } .lock-screen p { margin: 0; color: var(--hint); font-size: 13.5px; text-align: center; min-height: 38px; max-width: 300px; }
+  .lock-screen p.err { color: var(--red); }
+  .dots { display: flex; gap: 12px; margin: 18px 0 22px; min-height: 14px; }
+  .dots i { width: 13px; height: 13px; border-radius: 50%; background: var(--accent); animation: fade .12s; }
+  .dots i.ghost { background: var(--soft); }
+  .keys { display: grid; grid-template-columns: repeat(3, 72px); gap: 14px; }
+  .keys button { height: 72px; border-radius: 50%; background: var(--card); font-size: 26px; font-weight: 500; display: grid; place-items: center; }
+  .keys button:active { background: var(--soft); } .keys button.flat { background: none; font-size: 15px; font-weight: 650; color: var(--accent); }
+  .keys button:disabled { opacity: .35; }
+  .lock-screen .cancel { margin-top: 18px; color: var(--hint); font-weight: 600; padding: 8px 16px; }
+  .setrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .setrow label { flex: 1; min-width: 0; font-size: 14px; } .setrow label small { display: block; color: var(--hint); font-size: 11.5px; }
+  .setrow input { width: 86px; flex: none; text-align: center; padding: 9px 6px; }
+  .promo-form { display: grid; grid-template-columns: 1fr 74px 74px; gap: 8px; }
+  .pill.black { color: #fff; background: #3a3f4b; }
   .toast { position: fixed; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); z-index: 9; max-width: 86%;
            background: rgba(20, 22, 28, .92); color: #fff; padding: 9px 15px; border-radius: 12px; font-size: 13.5px; text-align: center; animation: fade .2s; }
 </style>
@@ -362,6 +392,23 @@ const TEXTS = {
     theme: 'Оформление', themes: ['Как в Telegram', 'Светлая', 'Тёмная'],
     history: 'История правок', vWas: 'Было', vNow: 'Сейчас', vStep: 'Версия {n}', oldFile: 'Показать прежний файл', oldFileChat: 'Прежний файл — в чат',
     getFile: 'Получить файл в чате', bigFile: 'Большой файл: откроется в чате с ботом',
+    fMedia: '🖼 Медиа', fKept: '⭐ Закладки', keptOn: 'Добавлено в закладки — не сотрётся по сроку', keptOff: 'Убрано из закладок',
+    emptyKept: 'Закладок нет', emptyKeptHint: 'Нажмите ☆ на сообщении — оно сохранится, даже когда выйдет срок хранения.',
+    emptyMedia: 'Фото и видео нет', emptyMediaHint: 'Здесь появятся удалённые фото, видео и кружки.',
+    pinTitle: 'PIN-код', pinOn: 'Включён: приложение открывается по коду', pinOff: 'Не установлен',
+    pinEnter: 'Введите PIN-код', pinNew: 'Придумайте PIN-код', pinNewHint: 'От 4 до 8 цифр', pinRepeat: 'Повторите PIN-код', pinMismatch: 'Коды не совпали. Попробуйте ещё раз.',
+    pinSet: 'PIN-код установлен', pinRemoved: 'PIN-код убран', pinChange: 'Сменить PIN-код', pinRemove: 'Убрать PIN-код',
+    pinForgot: 'Забыли код? Напишите боту /resetpin — он сбросит PIN вместе с сохранёнными сообщениями.',
+    weekly: 'Отчёт за неделю', weeklyHint: 'Раз в неделю в чат: кто удалял чаще и в какое время',
+    vault: 'Сейф для файлов', vaultOnHint: 'Подключён: {t}', vaultOffHint: 'Не подключён — нажмите, чтобы узнать как',
+    vaultHow: 'Как подключить сейф', vaultNote: 'Бот будет копировать в этот канал удалённые фото, видео и файлы — они останутся у вас, даже если Telegram перестанет их отдавать. Нужен Pro или VIP.',
+    vaultSteps: ['Создайте закрытый канал в Telegram (только для себя)', 'Добавьте в него бота администратором с правом публиковать сообщения', 'Бот напишет вам, что сейф подключён'],
+    promo: 'Промокод', promoPlaceholder: 'Введите код', apply: 'Применить', bannedTitle: 'Доступ закрыт',
+    aBan: '⛔️ Заблокировать', aUnban: 'Разблокировать', aHelper: '🛡 Сделать помощником', aUnhelper: 'Убрать из помощников', tagBanned: 'БАН', tagHelper: 'ПОМОЩНИК',
+    promoTitle: 'Промокоды', promoCodeLabel: 'Код', promoDays: 'Дней', promoUses: 'Раз', create: 'Создать промокод', promoNone: 'Промокодов пока нет',
+    promoUsed: 'использован {u} из {m} · {d} дн. Pro', del: 'Удалить',
+    setTitle: 'Цена и лимиты', save: 'Сохранить', setNote: 'Новая цена действует для новых подписок: у тех, кто уже оплатил, она прежняя.', badValues: 'Проверьте значения', saved2: 'Сохранено',
+    setNames: { stars: 'Цена Pro, звёзд в месяц', trialDays: 'Пробный Pro, дней', refDays: 'За приглашение, дней Pro', freeDays: 'Хранение без Pro, дней', proDays: 'Хранение с Pro, дней', freeFeed: 'Записей в истории без Pro', proFeed: 'Записей в истории с Pro' },
     cancel: 'Отмена', error: 'Не получилось загрузить', retry: 'Повторить', today: 'Сегодня', yesterday: 'Вчера',
     units: { s: 'с', m: 'мин', h: 'ч', d: 'дн' },
     kinds: { text: 'Текст', photo: 'Фото', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое', audio: 'Аудио', document: 'Файл', animation: 'GIF', sticker: 'Стикер', other: 'Другое' },
@@ -422,6 +469,23 @@ const TEXTS = {
     theme: "Ko'rinish", themes: ['Telegramdagidek', "Yorug'", "Qorong'i"],
     history: 'Tahrirlar tarixi', vWas: 'Avval', vNow: 'Hozir', vStep: '{n}-versiya', oldFile: "Avvalgi faylni ko'rsatish", oldFileChat: 'Avvalgi fayl — chatga',
     getFile: 'Faylni chatda olish', bigFile: 'Katta fayl: bot bilan chatda ochiladi',
+    fMedia: '🖼 Media', fKept: "⭐ Xatcho'plar", keptOn: "Xatcho'plarga qo'shildi — muddat tugasa ham o'chmaydi", keptOff: "Xatcho'plardan olib tashlandi",
+    emptyKept: "Xatcho'plar yo'q", emptyKeptHint: "Xabardagi ☆ ni bosing — saqlash muddati tugasa ham u saqlanib qoladi.",
+    emptyMedia: "Rasm va videolar yo'q", emptyMediaHint: "Bu yerda o'chirilgan rasm, video va dumaloq videolar paydo bo'ladi.",
+    pinTitle: 'PIN-kod', pinOn: 'Yoqilgan: ilova kod bilan ochiladi', pinOff: "O'rnatilmagan",
+    pinEnter: 'PIN-kodni kiriting', pinNew: "PIN-kod o'ylab toping", pinNewHint: '4 dan 8 gacha raqam', pinRepeat: 'PIN-kodni takrorlang', pinMismatch: "Kodlar mos kelmadi. Qayta urinib ko'ring.",
+    pinSet: "PIN-kod o'rnatildi", pinRemoved: 'PIN-kod olib tashlandi', pinChange: "PIN-kodni o'zgartirish", pinRemove: 'PIN-kodni olib tashlash',
+    pinForgot: "Kodni unutdingizmi? Botga /resetpin deb yozing — u PIN ni saqlangan xabarlar bilan birga tiklaydi.",
+    weekly: 'Haftalik hisobot', weeklyHint: "Haftada bir marta chatga: kim ko'proq o'chirgan va qachon",
+    vault: 'Fayllar uchun seyf', vaultOnHint: 'Ulangan: {t}', vaultOffHint: 'Ulanmagan — qanday ulashni bilish uchun bosing',
+    vaultHow: 'Seyfni qanday ulash', vaultNote: "Bot o'chirilgan rasm, video va fayllarni shu kanalga nusxalaydi — Telegram ularni bermay qo'ysa ham sizda qoladi. Pro yoki VIP kerak.",
+    vaultSteps: ['Telegramda yopiq kanal yarating (faqat o‘zingiz uchun)', "Botni unga xabar e'lon qilish huquqi bilan administrator qilib qo'shing", 'Bot sizga seyf ulanganini yozadi'],
+    promo: 'Promokod', promoPlaceholder: 'Kodni kiriting', apply: "Qo'llash", bannedTitle: 'Kirish yopilgan',
+    aBan: '⛔️ Bloklash', aUnban: 'Blokdan chiqarish', aHelper: '🛡 Yordamchi qilish', aUnhelper: 'Yordamchilikdan olish', tagBanned: 'BLOK', tagHelper: 'YORDAMCHI',
+    promoTitle: 'Promokodlar', promoCodeLabel: 'Kod', promoDays: 'Kun', promoUses: 'Marta', create: 'Promokod yaratish', promoNone: "Promokodlar hali yo'q",
+    promoUsed: '{m} tadan {u} tasi ishlatilgan · {d} kun Pro', del: "O'chirish",
+    setTitle: 'Narx va cheklovlar', save: 'Saqlash', setNote: "Yangi narx yangi obunalar uchun amal qiladi: to'lab bo'lganlar uchun avvalgisi qoladi.", badValues: 'Qiymatlarni tekshiring', saved2: 'Saqlandi',
+    setNames: { stars: 'Pro narxi, oyiga yulduz', trialDays: 'Sinov Pro, kun', refDays: 'Taklif uchun, kun Pro', freeDays: 'Pro siz saqlash, kun', proDays: 'Pro bilan saqlash, kun', freeFeed: 'Pro siz tarixdagi yozuvlar', proFeed: 'Pro bilan tarixdagi yozuvlar' },
     cancel: 'Bekor qilish', error: "Yuklab bo'lmadi", retry: 'Qayta urinish', today: 'Bugun', yesterday: 'Kecha',
     units: { s: 's', m: 'daq', h: 'soat', d: 'kun' },
     kinds: { text: 'Matn', photo: 'Rasm', video: 'Video', video_note: 'Dumaloq video', voice: 'Ovozli xabar', audio: 'Audio', document: 'Fayl', animation: 'GIF', sticker: 'Stiker', other: 'Boshqa' },
@@ -482,6 +546,23 @@ const TEXTS = {
     theme: 'Appearance', themes: ['Same as Telegram', 'Light', 'Dark'],
     history: 'Edit history', vWas: 'Before', vNow: 'Now', vStep: 'Version {n}', oldFile: 'Show the previous file', oldFileChat: 'Previous file — to chat',
     getFile: 'Get the file in chat', bigFile: 'Large file: it opens in the chat with the bot',
+    fMedia: '🖼 Media', fKept: '⭐ Bookmarks', keptOn: 'Bookmarked — it will not be erased when storage time runs out', keptOff: 'Removed from bookmarks',
+    emptyKept: 'No bookmarks', emptyKeptHint: 'Tap ☆ on a message — it stays even after the storage time runs out.',
+    emptyMedia: 'No photos or videos', emptyMediaHint: 'Deleted photos, videos and video messages will appear here.',
+    pinTitle: 'PIN code', pinOn: 'On: the app opens with a code', pinOff: 'Not set',
+    pinEnter: 'Enter your PIN', pinNew: 'Create a PIN', pinNewHint: '4 to 8 digits', pinRepeat: 'Repeat the PIN', pinMismatch: 'The codes did not match. Try again.',
+    pinSet: 'PIN is set', pinRemoved: 'PIN removed', pinChange: 'Change the PIN', pinRemove: 'Remove the PIN',
+    pinForgot: 'Forgot the code? Send /resetpin to the bot — it resets the PIN together with the saved messages.',
+    weekly: 'Weekly report', weeklyHint: 'Once a week in chat: who deleted the most and when',
+    vault: 'Safe for files', vaultOnHint: 'Connected: {t}', vaultOffHint: 'Not connected — tap to see how',
+    vaultHow: 'How to connect the safe', vaultNote: 'The bot copies deleted photos, videos and files to this channel — you keep them even if Telegram stops serving them. Needs Pro or VIP.',
+    vaultSteps: ['Create a private channel in Telegram (just for yourself)', 'Add the bot to it as an administrator who can post messages', 'The bot will message you that the safe is connected'],
+    promo: 'Promo code', promoPlaceholder: 'Enter the code', apply: 'Apply', bannedTitle: 'Access closed',
+    aBan: '⛔️ Block', aUnban: 'Unblock', aHelper: '🛡 Make a helper', aUnhelper: 'Remove from helpers', tagBanned: 'BLOCKED', tagHelper: 'HELPER',
+    promoTitle: 'Promo codes', promoCodeLabel: 'Code', promoDays: 'Days', promoUses: 'Uses', create: 'Create a promo code', promoNone: 'No promo codes yet',
+    promoUsed: 'used {u} of {m} · {d} days of Pro', del: 'Delete',
+    setTitle: 'Price and limits', save: 'Save', setNote: 'The new price applies to new subscriptions: people who already paid keep the old one.', badValues: 'Check the values', saved2: 'Saved',
+    setNames: { stars: 'Pro price, stars a month', trialDays: 'Pro trial, days', refDays: 'Per invite, days of Pro', freeDays: 'Storage without Pro, days', proDays: 'Storage with Pro, days', freeFeed: 'History records without Pro', proFeed: 'History records with Pro' },
     cancel: 'Cancel', error: 'Could not load', retry: 'Try again', today: 'Today', yesterday: 'Yesterday',
     units: { s: 's', m: 'min', h: 'h', d: 'd' },
     kinds: { text: 'Text', photo: 'Photo', video: 'Video', video_note: 'Video message', voice: 'Voice message', audio: 'Audio', document: 'File', animation: 'GIF', sticker: 'Sticker', other: 'Other' },
@@ -516,6 +597,11 @@ const ICON = {
   gift: '<path d="M4 11h16v9H4v-9ZM3 7h18v4H3V7ZM12 7v13M12 7c-1-3-5-3-5-.5S10 7 12 7Zm0 0c1-3 5-3 5-.5S14 7 12 7Z"/>',
   megaphone: '<path d="M4 10v4h3l8 5V5L7 10H4Z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  safe: '<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="11.500" r="3"/><path d="M7 19v2M17 19v2M12 8.500v-1"/>',
+  ticket: '<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8Z"/><path d="M14 6v12" stroke-dasharray="2 2"/>',
+  report: '<path d="M6 3h9l4 4v14H6V3Z"/><path d="M9 17v-3M12 17v-6M15 17v-4"/>',
+  back: '<path d="M20 6H9l-5 6 5 6h11V6Z"/><path d="M16 10l-4 4M12 10l4 4"/>',
   palette: '<path d="M12 3a9 9 0 1 0 0 18c1.500 0 2-1 2-2 0-1.500 1-2 2.500-2H18a3 3 0 0 0 3-3c0-5-4-9-9-9Z"/><circle cx="7.500" cy="11" r="1"/><circle cx="10" cy="7.500" r="1"/><circle cx="15" cy="7.500" r="1"/>',
   crown: '<path d="M4 18h16M4 15l-1-8 5 4 4-6 4 6 5-4-1 8H4Z"/>',
 };
@@ -550,8 +636,16 @@ applyTheme(theme);
 // Если на этом устройстве выбора ещё нет — берём тот, что сохранён в Telegram (общий для всех устройств).
 try { tg.CloudStorage.getItem('theme', (err, value) => { if (!err && value && value !== theme) { applyTheme(value); if (tab === 'me') showMe(); } }); } catch { /* нет облачного хранилища */ }
 
+let sessionPin = null; // PIN-код, введённый в этой сессии (нигде не сохраняется)
+const errCode = (err) => err?.parameters?.code;
 const call = (name, input = {}) => new Promise((resolve, reject) => {
-  tg.Serverless.call(name, input, (err, data) => (err ? reject(err) : resolve(data)));
+  tg.Serverless.call(name, sessionPin ? { ...input, pin: sessionPin } : input, (err, data) => {
+    if (!err) return resolve(data);
+    // Сервер требует PIN-код или доступ закрыт — показываем соответствующий экран.
+    if (['LOCKED', 'BAD_PIN', 'PIN_WAIT'].includes(errCode(err)) && name !== 'pin') { sessionPin = null; showLock(); }
+    if (errCode(err) === 'BANNED') showBanned(err.message);
+    reject(err);
+  });
 });
 const haptic = (kind = 'light') => { try { tg.HapticFeedback.impactOccurred(kind); } catch { /* нет вибрации */ } };
 
@@ -659,6 +753,63 @@ function planBadge(plan) {
   return h('span', { class: plan === 'pro' ? 'badge-pro' : 'badge-free' }, plan === 'pro' ? 'PRO' : L.planFree);
 }
 
+// Экран с цифровой клавиатурой. Возвращает введённый код или null, если нажали «Отмена».
+// check(code) — необязательная проверка: вернёт текст ошибки, и экран останется открытым.
+function askPin(title, hint, { cancel = true, check = null } = {}) {
+  return new Promise((resolve) => {
+    let code = '';
+    const dots = h('div', { class: 'dots' });
+    const note = h('p', {}, hint);
+    const ok = h('button', { class: 'flat' }, 'OK');
+    const paint = () => {
+      dots.replaceChildren(...(code ? Array.from(code, () => h('i')) : Array.from({ length: 4 }, () => h('i', { class: 'ghost' }))));
+      ok.disabled = code.length < 4;
+    };
+    const press = (d) => { haptic(); if (code.length < 8) { code += d; note.className = ''; note.textContent = hint; paint(); } };
+    const submit = async () => {
+      if (code.length < 4) return;
+      ok.disabled = true;
+      const problem = check ? await check(code) : null;
+      if (!problem) { screen.remove(); return resolve(code); }
+      try { tg.HapticFeedback.notificationOccurred('error'); } catch { /* нет вибрации */ }
+      code = ''; note.className = 'err'; note.textContent = problem; paint();
+    };
+    ok.onclick = submit;
+    const screen = h('div', { class: 'lock-screen' },
+      h('div', { class: 'logo', html: icon('lock', 30) }), h('h2', {}, title), note, dots,
+      h('div', { class: 'keys' },
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => h('button', { onclick: () => press(d) }, d)),
+        h('button', { class: 'flat', html: icon('back', 24), onclick: () => { haptic(); code = code.slice(0, -1); paint(); } }),
+        h('button', { onclick: () => press(0) }, 0), ok),
+      cancel && h('button', { class: 'cancel', onclick: () => { screen.remove(); resolve(null); } }, L.cancel));
+    paint();
+    document.body.append(screen);
+  });
+}
+
+// Приложение закрыто PIN-кодом: просим ввести и проверяем на сервере.
+let lockOpen = false;
+async function showLock() {
+  if (lockOpen) return;
+  lockOpen = true;
+  closeViewer();
+  const code = await askPin(L.pinEnter, L.pinForgot, {
+    cancel: false,
+    check: async (pin) => {
+      sessionPin = pin;
+      try { await call('pin'); return null; } catch (err) { sessionPin = null; return err.message && err.message !== 'PIN' ? err.message : L.error; }
+    },
+  });
+  sessionPin = code;
+  lockOpen = false;
+  go(tab);
+}
+
+function showBanned(text) {
+  if (document.querySelector('.lock-screen.ban')) return;
+  document.body.append(h('div', { class: 'lock-screen ban' }, h('div', { class: 'logo', html: icon('lock', 30) }), h('h2', {}, L.bannedTitle), h('p', {}, text)));
+}
+
 // Выезжающая снизу панель с кнопками. buttons: [{ text, cls, run }]
 function sheet(title, hint, buttons) {
   const close = () => shade.remove();
@@ -700,7 +851,7 @@ function banners() {
   }
   return null;
 }
-const segmented = (onPick) => h('div', { class: 'seg' }, [['all', L.all], ['deleted', L.fDeleted], ['edited', L.fEdited]].map(([key, label]) => h('button', {
+const segmented = (onPick) => h('div', { class: 'seg scroll' }, [['all', L.all], ['deleted', L.fDeleted], ['edited', L.fEdited], ['media', L.fMedia], ['kept', L.fKept]].map(([key, label]) => h('button', {
   class: key === filter ? 'on' : '', onclick: () => { haptic(); filter = key; onPick(); },
 }, label)));
 
@@ -819,7 +970,7 @@ async function showChat() {
   try { data = await call('feed', { type: filter, chatId: c.chatId }); } catch { return listBox.replaceChildren(h('div', { class: 'empty' }, L.error)); }
   if (openChat !== c) return;
   remember(data);
-  listBox.replaceChildren(...(data.items.length ? events(data.items, false) : [empty(L.emptyFeed, L.emptyFeedHint)]));
+  listBox.replaceChildren(...listOf(data.items, false));
 }
 
 // ============================================================================
@@ -841,14 +992,47 @@ async function showFeed() {
     try { data = await call('feed', { type: filter, q: asked }); } catch { return box.replaceChildren(h('div', { class: 'empty' }, L.error)); }
     if (tab !== 'feed' || asked !== feedQuery) return;
     remember(data);
-    box.replaceChildren(...(data.items.length ? events(data.items, true)
-      : [asked ? empty(L.notFound, '', 'search') : empty(L.emptyFeed, L.emptyFeedHint)]));
+    box.replaceChildren(...listOf(data.items, true, Boolean(asked)));
   }
   view().replaceChildren(h('div', { class: 'fade' },
     me && banners(), segmented(showFeed),
     h('div', { class: 'search' }, h('i', { html: icon('search', 18) }), input),
     box));
   await fetchFeed();
+}
+
+// Что показать, если список пуст, и чем его рисовать: галереей (для «Медиа») или карточками.
+function listOf(items, withName, searching = false) {
+  if (!items.length) {
+    if (searching) return [empty(L.notFound, '', 'search')];
+    if (filter === 'kept') return [empty(L.emptyKept, L.emptyKeptHint, 'star')];
+    if (filter === 'media') return [empty(L.emptyMedia, L.emptyMediaHint)];
+    return [empty(L.emptyFeed, L.emptyFeedHint)];
+  }
+  return filter === 'media' ? [gallery(items)] : events(items, withName);
+}
+
+// Галерея: сетка из удалённых фото и видео. Нажатие открывает на весь экран.
+function gallery(items) {
+  return h('div', { class: 'grid fade' }, items.map((item) => {
+    const meta = item.meta || {};
+    const isPhoto = item.kind === 'photo';
+    const small = (meta.size || 0) <= (me.inlineMedia || 0);
+    const cell = h('button', { class: 'cell' }, h('i', { html: icon(me.pro ? 'file' : 'lock', 24) }),
+      h('span', { class: 'who' }, item.name), !isPhoto && h('span', { class: 'dur' }, meta.duration ? `▶ ${mmss(meta.duration)}` : '▶'));
+    if (me.pro && (item.hasThumb || (isPhoto && small))) {
+      cell.load = () => mediaUrl(item.id, item.hasThumb).then(({ url }) => cell.prepend(h('img', { src: url, alt: '' })), () => {});
+      lazy.observe(cell);
+    }
+    cell.onclick = async () => {
+      haptic();
+      if (!me.pro) return toast(L.fileLocked);
+      if (!small) { try { toast((await call('sendMedia', { id: item.id })).message); } catch (err) { tg.showAlert(err.message || L.error); } return; }
+      toast(L.loadingMedia);
+      try { const { url } = await mediaUrl(item.id); openViewer({ type: isPhoto ? 'image' : 'video', url, item }); } catch (err) { tg.showAlert(err.message || L.mediaErr); }
+    };
+    return cell;
+  }));
 }
 
 // Список событий с разделителями по дням.
@@ -895,6 +1079,23 @@ function textBlock(content, long) {
 }
 const isLong = (text) => text.length > 420 || text.split('\n').length > 9;
 
+// Звёздочка-закладка: сообщение с ней не стирается по сроку хранения.
+function keepButton(item) {
+  const btn = h('button', { class: `star${item.kept ? ' on' : ''}` }, item.kept ? '★' : '☆');
+  btn.onclick = async () => {
+    haptic('medium');
+    const next = !item.kept;
+    try {
+      await call('settings', { keep: { id: item.id, on: next } });
+      item.kept = next;
+      btn.className = `star${next ? ' on' : ''}`;
+      btn.textContent = next ? '★' : '☆';
+      toast(next ? L.keptOn : L.keptOff);
+    } catch (err) { tg.showAlert(err.message || L.error); }
+  };
+  return btn;
+}
+
 function eventCard(item, withName) {
   const meta = item.meta || {};
   const cls = item.deletedAt && item.editedAt ? 'both' : item.deletedAt ? 'deleted' : 'edited';
@@ -905,7 +1106,8 @@ function eventCard(item, withName) {
     withName && h('div', { class: 'who' }, item.name),
     item.deletedAt && h('span', { class: 'tag red' }, `🗑 ${L.tagDeleted}`),
     item.editedAt && h('span', { class: 'tag amber' }, `✏️ ${L.tagEdited}`),
-    h('time', { style: withName ? '' : 'margin-left:auto' }, clock(item.at))));
+    h('time', { style: withName ? '' : 'margin-left:auto' }, clock(item.at)),
+    keepButton(item)));
 
   if (item.kind !== 'text') card.append(h('div', { class: 'kindline' }, kindLabel(item.kind, meta)));
 
@@ -1239,6 +1441,40 @@ async function showMe() {
     h('div', { class: 'mid' }, h('div', {}, L.modes[mode][0]), h('small', {}, L.modes[mode][1])),
     h('div', { class: `radio${mode === me.notify ? ' on' : ''}` })));
 
+  // PIN-код: поставить (ввести дважды), сменить или убрать.
+  async function newPin() {
+    const first = await askPin(L.pinNew, L.pinNewHint);
+    if (!first) return;
+    const second = await askPin(L.pinRepeat, L.pinNewHint);
+    if (!second) return;
+    if (first !== second) return toast(L.pinMismatch);
+    try { await call('pin', { set: first }); sessionPin = first; me.hasPin = true; toast(L.pinSet); } catch (err) { tg.showAlert(err.message || L.error); }
+    showMe();
+  }
+  const pinRow = () => {
+    haptic();
+    if (!me.hasPin) return newPin();
+    sheet(L.pinTitle, L.pinForgot, [
+      { text: L.pinChange, cls: 'primary', run: newPin },
+      { text: L.pinRemove, cls: 'danger', run: async () => { try { await call('pin', { remove: true }); sessionPin = null; me.hasPin = false; toast(L.pinRemoved); } catch { toast(L.error); } showMe(); } },
+    ]);
+  };
+  const vaultRow = () => {
+    haptic();
+    const shade = h('div', { class: 'shade', onclick: (e) => { if (e.target === shade) shade.remove(); } },
+      h('div', { class: 'sheet' }, h('h3', {}, L.vaultHow), h('p', {}, L.vaultNote),
+        h('ol', { class: 'steps', style: 'padding:0 0 10px 20px' }, L.vaultSteps.map((step, i) => h('li', {}, i === 1 && me.bot ? `${step} (@${me.bot})` : step))),
+        h('button', { class: 'btn', onclick: () => shade.remove() }, L.close)));
+    document.body.append(shade);
+  };
+  const promoInput = h('input', { class: 'field', type: 'text', placeholder: L.promoPlaceholder, autocapitalize: 'characters', maxlength: '20' });
+  const applyPromo = async () => {
+    const code = promoInput.value.trim();
+    if (!code) return;
+    haptic('medium');
+    try { const res = await call('promo', { code }); remember(res.profile); tg.showAlert(res.message); showMe(); } catch (err) { tg.showAlert(err.message || L.error); }
+  };
+
   const link = me.bot ? `https://t.me/${me.bot}?start=ref_${me.id}` : '';
   const copy = async () => { try { await navigator.clipboard.writeText(link); toast(L.copied); } catch { tg.showAlert(link); } };
 
@@ -1261,6 +1497,8 @@ async function showMe() {
           h('button', { class: 'btn primary', onclick: () => { haptic(); tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(L.shareText)}`); } }, h('i', { html: icon('send', 16) }), L.shareBtn),
           h('button', { class: 'btn', onclick: copy }, L.copy))),
     ],
+    h('div', { class: 'section' }, L.promo),
+    h('div', { class: 'card pad' }, h('div', { class: 'inline' }, promoInput, h('button', { class: 'btn primary', onclick: applyPromo }, L.apply))),
     h('div', { class: 'section' }, L.theme),
     h('div', { class: 'seg' }, ['system', 'light', 'dark'].map((key, i) => h('button', {
       class: key === theme ? 'on' : '', onclick: () => { haptic(); applyTheme(key, true); showMe(); },
@@ -1275,7 +1513,19 @@ async function showMe() {
         }, label)))),
       h('div', { class: 'opt' },
         h('div', { class: `ic ${me.connected ? 'green' : 'red'}`, html: icon('link', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.connection), h('small', {}, me.connected ? L.connected : L.notConnected)))),
+        h('div', { class: 'mid' }, h('div', {}, L.connection), h('small', {}, me.connected ? L.connected : L.notConnected))),
+      h('button', { class: 'opt', onclick: pinRow },
+        h('div', { class: `ic ${me.hasPin ? 'green' : ''}`, html: icon('lock', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.pinTitle), h('small', {}, me.hasPin ? L.pinOn : L.pinOff)),
+        h('i', { class: 'chev', html: icon('chev', 18) })),
+      h('button', { class: 'opt', onclick: vaultRow },
+        h('div', { class: `ic ${me.vault ? 'green' : 'violet'}`, html: icon('safe', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.vault), h('small', {}, me.vault ? fill(L.vaultOnHint, { t: me.vault }) : L.vaultOffHint)),
+        h('i', { class: 'chev', html: icon('chev', 18) })),
+      h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ weekly: !me.weekly }); } },
+        h('div', { class: 'ic amber', html: icon('report', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.weekly), h('small', {}, L.weeklyHint)),
+        h('div', { class: `switch${me.weekly ? ' on' : ''}` }))),
     !me.connected && [h('div', { class: 'section' }, L.how), h('div', { class: 'card' }, h('ol', { class: 'steps' }, L.steps.map((s) => h('li', {}, s))))],
     h('div', { class: 'card' },
       h('button', { class: 'opt', onclick: () => tg.showConfirm(L.wipeAsk, (ok) => { if (ok) { chatsCache = []; save({ wipe: true }).then(() => toast(L.wiped)); } }) },
@@ -1306,6 +1556,8 @@ async function showAdmin(input = {}) {
       h('div', { class: 'sub' }, `${num(u.chats)} ${L.aChatsShort} · 🗑 ${num(u.deleted)} · ✏️ ${num(u.edited)}`)),
     h('div', { class: 'pills' },
       u.owner ? h('span', { class: 'pill vip' }, `👑 ${L.aOwner}`) : u.vip ? h('span', { class: 'pill vip' }, '💎 VIP') : u.pro && h('span', { class: 'pill gold' }, 'PRO'),
+      u.banned && h('span', { class: 'pill black' }, `⛔️ ${L.tagBanned}`),
+      u.helper && h('span', { class: 'pill red' }, `🛡 ${L.tagHelper}`),
       h('span', { class: `pill ${u.connected ? 'green' : 'gray'}` }, u.connected ? L.aOn : L.aOffline)));
 
   function manage(u) {
@@ -1313,11 +1565,14 @@ async function showAdmin(input = {}) {
     if (u.owner) return toast(`👑 ${L.planOwner} · VIP`);
     const state = u.vip ? `💎 VIP` : u.pro ? fill(L.until, { date: fullDate(u.proUntil) }) : L.aNoPro;
     sheet(u.name || `ID ${u.id}`, fill(L.aGiveHint, { state }), [
-      u.vip ? { text: L.aTakeVip, cls: 'danger', run: () => act({ action: 'vip', userId: u.id, on: false }) }
-        : { text: L.aGiveVip, cls: 'primary', run: () => act({ action: 'vip', userId: u.id, on: true }) },
+      // VIP и помощников назначает только владелец.
+      me.boss && (u.vip ? { text: L.aTakeVip, cls: 'danger', run: () => act({ action: 'vip', userId: u.id, on: false }) }
+        : { text: L.aGiveVip, cls: 'primary', run: () => act({ action: 'vip', userId: u.id, on: true }) }),
       { text: `Pro ${L.a30}`, run: () => act({ action: 'pro', userId: u.id, days: 30 }) },
       { text: `Pro ${L.a365}`, run: () => act({ action: 'pro', userId: u.id, days: 365 }) },
       u.pro && !u.vip && { text: L.aOff, cls: 'danger', run: () => act({ action: 'pro', userId: u.id, days: 0 }) },
+      me.boss && { text: u.helper ? L.aUnhelper : L.aHelper, run: () => act({ action: 'role', userId: u.id, on: !u.helper }) },
+      { text: u.banned ? L.aUnban : L.aBan, cls: u.banned ? '' : 'danger', run: () => act({ action: 'ban', userId: u.id, on: !u.banned }) },
     ].filter(Boolean));
   }
 
@@ -1363,6 +1618,30 @@ async function showAdmin(input = {}) {
     });
   };
 
+  // Промокоды.
+  const pCode = h('input', { class: 'field', type: 'text', placeholder: L.promoCodeLabel, maxlength: '20', autocapitalize: 'characters' });
+  const pDays = h('input', { class: 'field', type: 'text', inputmode: 'numeric', placeholder: L.promoDays, value: '7' });
+  const pUses = h('input', { class: 'field', type: 'text', inputmode: 'numeric', placeholder: L.promoUses, value: '10' });
+  const addPromo = async () => {
+    haptic('medium');
+    try { await call('admin', { action: 'promoAdd', code: pCode.value, days: Number(pDays.value), uses: Number(pUses.value) }); } catch { return toast(L.badValues); }
+    act({});
+  };
+
+  // Цена и лимиты (только владелец).
+  const inputs = {};
+  const setRows = Object.entries(data.settings).map(([key, v]) => {
+    inputs[key] = h('input', { class: 'field', type: 'text', inputmode: 'numeric', value: v.value });
+    return h('div', { class: 'setrow' }, h('label', {}, L.setNames[key], h('small', {}, `${v.min}–${v.max}`)), inputs[key]);
+  });
+  const saveSettings = async () => {
+    haptic('medium');
+    const values = Object.fromEntries(Object.entries(inputs).map(([key, node]) => [key, Number(node.value)]));
+    try { await call('admin', { action: 'settings', values }); } catch { return toast(L.badValues); }
+    await showAdmin({});
+    toast(L.saved2);
+  };
+
   const stepRow = (label, n) => h('div', { class: 'step' },
     h('div', {}, h('span', {}, label), h('b', {}, `${num(n)} · ${t.started ? Math.round((n / t.started) * 100) : 0}%`)),
     h('div', { class: 'track' }, h('div', { class: 'fill', style: `width:${t.started ? Math.min(100, (n / t.started) * 100) : 0}%` })));
@@ -1381,14 +1660,26 @@ async function showAdmin(input = {}) {
     h('div', { class: 'card pad funnel' }, stepRow(L.fStarted, t.started), stepRow(L.fConnected, t.everConnected), stepRow(L.fPaid, t.paid)),
     h('div', { class: 'section' }, L.aNew),
     h('div', { class: 'card pad' }, bars(data.days.map((d) => [d.users]), ['blue'], data.days.map((d, i) => (i % 2 ? '' : new Date(d.day * 1000).getUTCDate())))),
-    h('div', { class: 'section' }, L.vipById),
-    h('div', { class: 'card pad' }, h('div', { class: 'inline' }, idInput, h('button', { class: 'btn primary', onclick: giveVip }, L.give)),
+    me.boss && h('div', { class: 'section' }, L.vipById),
+    me.boss && h('div', { class: 'card pad' }, h('div', { class: 'inline' }, idInput, h('button', { class: 'btn primary', onclick: giveVip }, L.give)),
       h('div', { class: 'hint', style: 'margin-top:8px' }, L.vipByIdHint)),
     h('div', { class: 'section' }, `${L.aList} · ${num(t.users)}`),
     data.users.length > 5 && h('div', { class: 'search' }, h('i', { html: icon('search', 18) }), find),
     list,
-    h('div', { class: 'section' }, L.bcTitle),
-    h('div', { class: 'card pad' }, bcText, bcBtn, h('div', { class: 'hint', style: 'margin-top:8px' }, L.bcHint)),
+    h('div', { class: 'section' }, L.promoTitle),
+    h('div', { class: 'card pad' },
+      h('div', { class: 'promo-form' }, pCode, pDays, pUses),
+      h('button', { class: 'btn primary', style: 'margin-top:8px; width:100%', onclick: addPromo }, h('i', { html: icon('ticket', 17) }), L.create),
+      data.promos.length ? data.promos.map((p) => h('div', { class: 'setrow', style: 'padding-top:12px' },
+        h('label', {}, h('b', {}, p.code), h('small', {}, fill(L.promoUsed, { u: p.used, m: p.maxUses, d: p.days }))),
+        h('button', { class: 'mini', style: 'margin:0; color:var(--red)', onclick: () => act({ action: 'promoDel', code: p.code }) }, L.del)))
+        : h('div', { class: 'hint', style: 'margin-top:10px' }, L.promoNone)),
+    me.boss && h('div', { class: 'section' }, L.setTitle),
+    me.boss && h('div', { class: 'card pad' }, setRows,
+      h('button', { class: 'btn primary', style: 'margin-top:6px; width:100%', onclick: saveSettings }, L.save),
+      h('div', { class: 'hint', style: 'margin-top:8px' }, L.setNote)),
+    me.boss && h('div', { class: 'section' }, L.bcTitle),
+    me.boss && h('div', { class: 'card pad' }, bcText, bcBtn, h('div', { class: 'hint', style: 'margin-top:8px' }, L.bcHint)),
     h('div', { class: 'section' }, L.aPays),
     h('div', { class: 'card' }, data.payments.length
       ? data.payments.map((p) => h('div', { class: 'kv' }, h('span', {}, `ID ${p.userId} · ${stamp(p.at)}`), h('b', {}, `⭐️ ${num(p.stars)}`)))

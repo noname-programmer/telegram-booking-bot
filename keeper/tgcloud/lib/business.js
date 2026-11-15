@@ -17,5 +17,6 @@ export async function ownerOf(connectionId) {
   }
   if (!conn?.enabled) return null;
   const user = await getUser({ id: conn.userId });
+  if (user.banned) return null; // заблокированным бот ничего не сохраняет и не присылает
   return { conn, user };
 }

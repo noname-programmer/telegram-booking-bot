@@ -15,7 +15,7 @@ function stamp(unix, tz) {
 }
 
 export default async function (input, ctx) {
-  const { user, pro } = await whoami(ctx);
+  const { user, pro } = await whoami(ctx, input);
   if (!pro) throw new EndpointError(t(user.lang, 'needPro'), { code: 'NEED_PRO' });
   const chatId = Number(input.chatId);
   const chat = await getChat(user.id, chatId);

@@ -6,7 +6,7 @@ import { listChats, setPrefs } from '../lib/store.js';
 import { whoami } from '../lib/app.js';
 
 export default async function (input, ctx) {
-  const { user, profile } = await whoami(ctx);
+  const { user, profile } = await whoami(ctx, input);
   const tz = Math.round(Number(input.tz));
   if (Number.isFinite(tz) && Math.abs(tz) <= 840 && tz !== user.tz) await setPrefs(user.id, { tz });
   const rows = await listChats(user.id);

@@ -4,7 +4,7 @@
 import { api } from 'sdk';
 import { ADMIN_IDS, PRO } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
-import { getUser, grantPro, now, stats, setReferrer, adminSetVip } from '../lib/store.js';
+import { getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo } from '../lib/store.js';
 import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate } from '../lib/ui.js';
 
 export default async function onMessage(message) {
@@ -23,11 +23,28 @@ export default async function onMessage(message) {
     return;
   }
 
+  if (user.banned) return send(chatId, t(lang, 'banned'));
+
   const command = (message.text ?? '').split(/[\s@]/)[0];
   if (command === '/pro') return send(chatId, ...split(await proScreen(user)));
   if (command === '/lang') return send(chatId, t(lang, 'chooseLang'), { reply_markup: langKeyboard() });
   if (command === '/privacy') return send(chatId, ...split(privacyScreen(lang)));
-  if (command === '/stats' && ADMIN_IDS.includes(user.id)) return send(chatId, t(lang, 'stats', await stats()));
+  if (command === '/stats' && isAdmin(user)) return send(chatId, t(lang, 'stats', await stats()));
+
+  // /promo КОД — получить дни Pro по промокоду.
+  if (command === '/promo') {
+    const res = await redeemPromo(user, (message.text ?? '').split(/\s+/)[1]);
+    return send(chatId, res.ok ? t(lang, 'promoOk', { days: res.days, date: fmtDate(res.until) }) : t(lang, `promo_${res.reason}`));
+  }
+
+  // /resetpin — забыли PIN-код от приложения. Сбросить можно только вместе со всеми сохранёнными данными,
+  // иначе PIN ничего бы не защищал.
+  if (command === '/resetpin') {
+    if (!user.pin) return send(chatId, t(lang, 'pinNone'));
+    return send(chatId, t(lang, 'pinResetAsk'), { reply_markup: { inline_keyboard: [[
+      { text: t(lang, 'btnPinReset'), callback_data: 'pin:reset' }, { text: t(lang, 'btnNo'), callback_data: 'wipe:no' },
+    ]] } });
+  }
 
   // /vip 123456 и /unvip 123456 — выдать или снять бессрочный VIP (только для владельца).
   if ((command === '/vip' || command === '/unvip') && ADMIN_IDS.includes(user.id)) {

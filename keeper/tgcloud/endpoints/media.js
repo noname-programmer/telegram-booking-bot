@@ -19,7 +19,7 @@ function parse(meta) {
 }
 
 export default async function (input, ctx) {
-  const { user, pro } = await whoami(ctx);
+  const { user, pro } = await whoami(ctx, input);
   if (!pro) throw new EndpointError(t(user.lang, 'needPro'), { code: 'NEED_PRO' });
   const gone = (code) => new EndpointError(t(user.lang, 'notFound'), { code });
   const tooBig = () => new EndpointError(t(user.lang, 'tooBig'), { code: 'TOO_BIG' });

@@ -26,6 +26,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   timeline with word-level highlighting, file cards for documents. A file replaced by an edit is kept
   (`edits.old_file_id`). The `media` endpoint reads files as a stream with a size cap. "Deleted" time can no longer be
   earlier than "sent".
+- Keeper: a "safe" channel that receives copies of deleted files (`my_chat_member` handler), a media gallery,
+  bookmarks that survive retention, a server-checked PIN for the Mini App, promo codes, price and limits editable
+  from the admin panel (`settings` table), user blocking, a weekly report and a helper admin role without VIP rights.
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).

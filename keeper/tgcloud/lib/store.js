@@ -3,18 +3,60 @@
 
 import { db } from 'sdk';
 import { eq, and, or, gt, asc, desc, inArray, isNotNull, sql } from 'sdk/db';
-import { users, connections, chats, messages, edits, payments } from '../schema.js';
-import { LIMITS, PRO, OWNER_ID } from './config.js';
+import { users, connections, chats, messages, edits, payments, promos, promoUses, settings } from '../schema.js';
+import { LIMITS, PRO, REF, OWNER_ID, ADMIN_IDS } from './config.js';
 import { pickLang } from './i18n.js';
 
 export const now = () => Math.floor(Date.now() / 1000);
 const DAY = 24 * 60 * 60;
+
+// ---------- настройки из админ-панели ----------
+// Цена и лимиты записаны в lib/config.js, но владелец может поменять их из приложения.
+// Изменённые значения лежат в таблице settings и «накладываются» поверх config.js.
+
+// ключ → [где лежит, имя, минимум, максимум]
+const TUNABLE = {
+  stars: [PRO, 'stars', 1, 10000],          // цена Pro в звёздах
+  trialDays: [PRO, 'trialDays', 0, 30],     // пробный срок
+  refDays: [REF, 'days', 0, 365],           // награда за приглашение
+  freeDays: [LIMITS, 'freeDays', 1, 30],    // хранение без Pro
+  proDays: [LIMITS, 'proDays', 1, 365],     // хранение с Pro
+  freeFeed: [LIMITS, 'freeFeed', 1, 100],   // записей в истории без Pro
+  proFeed: [LIMITS, 'proFeed', 10, 500],    // записей в истории с Pro
+};
+const valid = (key, value) => TUNABLE[key] && Number.isInteger(value) && value >= TUNABLE[key][2] && value <= TUNABLE[key][3];
+
+let settingsAt = 0;
+// Читает настройки из базы не чаще раза в минуту (чтобы не делать лишний запрос на каждое сообщение).
+export async function loadSettings(force = false) {
+  if (!force && Date.now() - settingsAt < 60_000) return;
+  for (const row of await db.select().from(settings).all()) {
+    if (valid(row.key, row.value)) TUNABLE[row.key][0][TUNABLE[row.key][1]] = row.value;
+  }
+  settingsAt = Date.now();
+}
+
+export const currentSettings = () => Object.fromEntries(Object.entries(TUNABLE).map(([key, [box, name, min, max]]) => [key, { value: box[name], min, max }]));
+
+// Сохраняет новые значения. Возвращает false, если хоть одно не проходит проверку — тогда не меняется ничего.
+export async function saveSettings(patch) {
+  const entries = Object.entries(patch).map(([key, value]) => [key, Number(value)]);
+  if (!entries.length || !entries.every(([key, value]) => valid(key, value))) return false;
+  const next = { ...Object.fromEntries(Object.entries(currentSettings()).map(([k, v]) => [k, v.value])), ...Object.fromEntries(entries) };
+  if (next.proDays < next.freeDays || next.proFeed < next.freeFeed) return false; // Pro не может быть хуже бесплатного
+  for (const [key, value] of entries) {
+    await db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
+  }
+  await loadSettings(true);
+  return true;
+}
 
 // ---------- пользователи ----------
 
 // Находит пользователя или создаёт нового (язык берём из его Telegram).
 // Заодно обновляет имя, один раз выдаёт пробный Pro и следит, чтобы у владельца был VIP.
 export async function getUser(tgUser) {
+  await loadSettings();
   const real = Boolean(tgUser.first_name); // настоящие данные из Telegram, а не одна только цифра ID
   const name = real ? displayName(tgUser) : '';
   const username = tgUser.username ?? '';
@@ -23,7 +65,8 @@ export async function getUser(tgUser) {
     found = {
       id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0, name, username,
       notify: 0, favOnly: 0, vip: 0, trial: 0, tz: 300, refBy: null, refDone: 0,
-      digestDay: 0, digestDel: 0, digestEd: 0, created: now(),
+      digestDay: 0, digestDel: 0, digestEd: 0, banned: 0, role: '', pin: null, pinFails: 0, pinLock: 0,
+      vaultId: null, vaultTitle: '', weekly: 1, reportWeek: 0, created: now(),
     };
     await db.insert(users).values(found).onConflictDoNothing({ target: users.id }).run();
   }
@@ -46,7 +89,11 @@ export async function getUser(tgUser) {
 // Pro есть у тех, кто оплатил (или на пробном сроке), и у всех с VIP.
 export const isPro = (user) => Boolean(user.vip) || user.proUntil > now();
 
-// Меняет настройки пользователя: { notify, favOnly, tz, lang }.
+// Админ — владелец (ADMIN_IDS в config.js) или назначенный им помощник (role = 'admin').
+export const isAdmin = (user) => ADMIN_IDS.includes(user.id) || user.role === 'admin';
+export const isOwner = (user) => ADMIN_IDS.includes(user.id);
+
+// Меняет настройки пользователя: { notify, favOnly, tz, lang, ... }.
 export async function setPrefs(userId, patch) {
   if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, userId)).run();
 }
@@ -66,6 +113,140 @@ export async function addProDays(userId, days) {
   const proUntil = Math.max(now(), user.proUntil) + Math.floor(days) * DAY;
   await db.update(users).set({ proUntil }).where(eq(users.id, userId)).run();
   return proUntil;
+}
+
+// ---------- PIN-код на вход в приложение ----------
+
+// Превращает PIN в «отпечаток», чтобы в базе не лежали сами цифры.
+export function pinHash(userId, pin) {
+  let a = 0x811c9dc5; let b = 0x1b873593;
+  const text = `${userId}:${pin}:keeper`;
+  for (let round = 0; round < 2000; round++) {
+    for (let i = 0; i < text.length; i++) {
+      a = Math.imul(a ^ text.charCodeAt(i), 0x01000193);
+      b = Math.imul(b + text.charCodeAt(i) + round, 0x85ebca6b) ^ (a >>> 13);
+    }
+  }
+  return `${(a >>> 0).toString(16)}${(b >>> 0).toString(16)}`;
+}
+
+export const validPin = (pin) => typeof pin === 'string' && /^\d{4,8}$/.test(pin);
+
+export async function setPin(user, pin) {
+  const patch = { pin: pin === null ? null : pinHash(user.id, pin), pinFails: 0, pinLock: 0 };
+  await setPrefs(user.id, patch);
+  Object.assign(user, patch);
+}
+
+// Проверяет PIN. 'ok' | 'wrong' | 'wait' (слишком много попыток — пауза).
+export async function checkPin(user, pin) {
+  if (user.pinLock > now()) return 'wait';
+  if (validPin(pin) && pinHash(user.id, pin) === user.pin) {
+    if (user.pinFails) await setPrefs(user.id, { pinFails: 0 });
+    return 'ok';
+  }
+  const fails = user.pinFails + 1;
+  const patch = fails >= LIMITS.pinTries ? { pinFails: 0, pinLock: now() + LIMITS.pinPause } : { pinFails: fails };
+  await setPrefs(user.id, patch);
+  Object.assign(user, patch);
+  return patch.pinLock ? 'wait' : 'wrong';
+}
+
+// ---------- промокоды ----------
+
+export const promoCode = (text) => String(text ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+
+export async function createPromo(code, days, maxUses) {
+  const row = { code: promoCode(code), days: Math.floor(days), maxUses: Math.floor(maxUses), used: 0, created: now() };
+  if (row.code.length < 4 || !(row.days >= 1 && row.days <= 3650) || !(row.maxUses >= 1 && row.maxUses <= 100000)) return null;
+  if (await db.select().from(promos).where(eq(promos.code, row.code)).get()) return null;
+  await db.insert(promos).values(row).run();
+  return row;
+}
+
+export async function deletePromo(code) {
+  await db.delete(promos).where(eq(promos.code, promoCode(code))).run();
+}
+
+export async function listPromos() {
+  return db.select().from(promos).orderBy(desc(promos.created)).limit(100).all();
+}
+
+// Применяет промокод. { ok: true, days, until } или { ok: false, reason: 'unknown' | 'used' | 'over' }.
+export async function redeemPromo(user, text) {
+  const code = promoCode(text);
+  const promo = code.length >= 4 ? await db.select().from(promos).where(eq(promos.code, code)).get() : null;
+  if (!promo) return { ok: false, reason: 'unknown' };
+  if (await db.select().from(promoUses).where(and(eq(promoUses.code, code), eq(promoUses.userId, user.id))).get()) return { ok: false, reason: 'used' };
+  if (promo.used >= promo.maxUses) return { ok: false, reason: 'over' };
+  await db.insert(promoUses).values({ code, userId: user.id, at: now() }).run();
+  await db.run(sql`update promos set used = used + 1 where code = ${code}`);
+  const until = await addProDays(user.id, promo.days);
+  user.proUntil = until;
+  return { ok: true, days: promo.days, until };
+}
+
+// ---------- «сейф»: канал, куда бот копирует удалённые файлы ----------
+
+export async function setVault(userId, chatId, title) {
+  await setPrefs(userId, { vaultId: chatId, vaultTitle: String(title ?? '').slice(0, 80) });
+}
+
+// Бота убрали из канала — отвязываем «сейф» у всех, у кого он был этим каналом.
+export async function clearVault(chatId) {
+  await db.update(users).set({ vaultId: null, vaultTitle: '' }).where(eq(users.vaultId, chatId)).run();
+}
+
+// ---------- закладки ----------
+
+// Ставит или снимает закладку. Возвращает false, если закладок уже слишком много.
+export async function setKept(user, id, on) {
+  const row = await getOwnMessage(user.id, id);
+  if (!row) return null;
+  if (on && !row.kept) {
+    const have = await db.$count(messages, and(eq(messages.ownerId, user.id), eq(messages.kept, 1)));
+    if (have >= (isPro(user) ? LIMITS.proKept : LIMITS.freeKept)) return false;
+  }
+  await db.update(messages).set({ kept: on ? 1 : 0 }).where(eq(messages.id, row.id)).run();
+  return true;
+}
+
+// ---------- отчёт за неделю ----------
+
+// Номер недели (недели начинаются в понедельник по местному времени пользователя).
+const weekOf = (unix, tz) => Math.floor((Math.floor((unix + tz * 60) / DAY) + 3) / 7);
+const weekStart = (week, tz) => (week * 7 - 3) * DAY - tz * 60;
+
+// Если началась новая неделя — возвращает цифры за прошлую (или null, если отчёт уже был либо показывать нечего).
+export async function weeklyTick(user) {
+  const week = weekOf(now(), user.tz);
+  if (user.reportWeek === week) return null;
+  const first = user.reportWeek === 0;
+  await setPrefs(user.id, { reportWeek: week });
+  user.reportWeek = week;
+  if (first) return null; // первую неполную неделю пропускаем
+  const from = weekStart(week - 1, user.tz);
+  const to = weekStart(week, user.tz);
+  const rows = await db.select({
+    name: messages.fromName, deletedAt: messages.deletedAt, editedAt: messages.editedAt,
+  }).from(messages)
+    .where(and(eq(messages.ownerId, user.id), or(isNotNull(messages.deletedAt), isNotNull(messages.editedAt))))
+    .limit(5000).all();
+  const inWeek = (at) => at !== null && at >= from && at < to;
+  const names = new Map();
+  const hours = Array(24).fill(0);
+  let deleted = 0; let edited = 0;
+  for (const r of rows) {
+    if (inWeek(r.deletedAt)) {
+      deleted++;
+      names.set(r.name, (names.get(r.name) ?? 0) + 1);
+      hours[Math.floor((((r.deletedAt + user.tz * 60) % DAY) + DAY) % DAY / 3600)]++;
+    }
+    if (inWeek(r.editedAt)) edited++;
+  }
+  if (!deleted && !edited) return null;
+  const top = [...names.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  return { deleted, edited, top, hour: deleted ? hours.indexOf(Math.max(...hours)) : null };
 }
 
 // ---------- приглашения ----------
@@ -185,6 +366,11 @@ export function details(m) {
     if (file.width && file.height) meta.dim = `${file.width}×${file.height}`;
     if (file.emoji) meta.emoji = file.emoji;
     if (file.thumbnail?.file_id) meta.thumb = file.thumbnail.file_id; // маленькая картинка-превью
+    // У фото превью — уменьшенная копия (нужна для галереи, чтобы не грузить большие картинки).
+    if (Array.isArray(m.photo) && m.photo.length > 1) {
+      const small = m.photo.filter((p) => (p.width ?? 0) <= 320).at(-1) ?? m.photo[0];
+      if (small.file_id !== file.file_id) meta.thumb = small.file_id;
+    }
     if (m.sticker) meta.sticker = file.is_video ? 'video' : file.is_animated ? 'animated' : 'static';
     if (file.title || file.performer) meta.title = [file.performer, file.title].filter(Boolean).join(' — ').slice(0, 120);
   }
@@ -301,10 +487,13 @@ export async function recordEdit(row, m) {
 // ---------- история для мини-приложения ----------
 
 // type: 'deleted' | 'edited' | 'all'; chatId — только один собеседник (или null — все).
-// q — поиск по тексту сообщения.
+// q — поиск по тексту сообщения. Ещё два вида: 'media' — только фото и видео, 'kept' — только закладки.
+const VISUAL = ['photo', 'video', 'video_note', 'animation'];
 export async function feed(ownerId, { type = 'all', chatId = null, q = '', limit }) {
   const base = [eq(messages.ownerId, ownerId)];
   if (chatId !== null) base.push(eq(messages.chatId, chatId));
+  if (type === 'media') base.push(inArray(messages.kind, VISUAL));
+  if (type === 'kept') base.push(eq(messages.kept, 1));
   // Поиск делаем сами, а не в базе: база не умеет сравнивать русские буквы без учёта регистра.
   const needle = String(q).trim().toLowerCase().slice(0, 60);
   const pick = async (col) => {
@@ -330,7 +519,7 @@ export async function feed(ownerId, { type = 'all', chatId = null, q = '', limit
     : [];
   return rows.map((r) => ({
     ...r,
-    at: type === 'deleted' ? r.deletedAt : type === 'edited' ? r.editedAt : eventAt(r),
+    at: type === 'deleted' ? r.deletedAt : type === 'edited' ? r.editedAt : eventAt(r) || r.date,
     versions: history.filter((e) => e.msgId === r.id)
       .map((e) => ({ id: e.id, text: e.oldText, at: e.at, kind: e.oldKind ?? r.kind, hasFile: Boolean(e.oldFileId) })),
   }));
@@ -379,8 +568,10 @@ export async function cleanup() {
   const t = now();
   const proCut = t - LIMITS.proDays * DAY;
   const freeCut = t - LIMITS.freeDays * DAY;
-  const old = sql`date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t} or vip = 1))`;
-  await db.run(sql`delete from edits where at < ${proCut} or msg_id in (select id from messages where ${old})`);
+  // Закладки (kept = 1) не стираем.
+  const old = sql`kept = 0 and (date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t} or vip = 1)))`;
+  await db.run(sql`delete from edits where msg_id in (select id from messages where ${old})`);
+  await db.run(sql`delete from edits where msg_id not in (select id from messages)`);
   await db.run(sql`delete from messages where ${old}`);
 }
 
@@ -468,6 +659,7 @@ export async function adminOverview() {
     started: await one(sql`select count(*) as n from users where name <> ''`),
     everConnected: await one(sql`select count(distinct user_id) as n from connections`),
     paid: await one(sql`select count(distinct user_id) as n from payments`),
+    banned: await one(sql`select count(*) as n from users where banned = 1`),
   };
   const today = Math.floor(t / DAY);
   const days = Array.from({ length: 14 }, (_, i) => ({ day: (today - 13 + i) * DAY, users: 0 }));
@@ -488,10 +680,13 @@ export async function adminOverview() {
     users: all.slice(0, 100).map((u) => ({
       id: u.id, name: u.name, username: u.username, lang: u.lang, created: u.created, notify: u.notify,
       proUntil: u.proUntil, pro: isPro(u), vip: Boolean(u.vip), owner: u.id === OWNER_ID,
-      refBy: u.refBy ?? null, connected: active.has(u.id),
+      refBy: u.refBy ?? null, connected: active.has(u.id), banned: Boolean(u.banned), role: u.role,
+      helper: u.role === 'admin', vault: Boolean(u.vaultId), hasPin: Boolean(u.pin),
       ...(usage.get(u.id) ?? { chats: 0, saved: 0, deleted: 0, edited: 0 }),
     })),
     payments: await db.select().from(payments).orderBy(desc(payments.at)).limit(30).all(),
+    promos: await listPromos(),
+    settings: currentSettings(),
   };
 }
 
@@ -516,4 +711,20 @@ export async function adminSetVip(userId, on) {
 // Порция пользователей для рассылки: те, кто запускал бота, по возрастанию ID после after.
 export async function broadcastBatch(after, limit) {
   return db.select().from(users).where(and(gt(users.id, after), sql`name <> ''`)).orderBy(asc(users.id)).limit(limit).all();
+}
+
+// Блокирует или разблокирует пользователя. Владельца и админов из config.js заблокировать нельзя.
+export async function adminSetBanned(userId, on) {
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user || ADMIN_IDS.includes(userId)) return null;
+  await setPrefs(userId, { banned: on ? 1 : 0 });
+  return { ...user, banned: on ? 1 : 0 };
+}
+
+// Назначает или снимает помощника (второго админа).
+export async function adminSetRole(userId, on) {
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user || ADMIN_IDS.includes(userId)) return null;
+  await setPrefs(userId, { role: on ? 'admin' : '' });
+  return { ...user, role: on ? 'admin' : '' };
 }

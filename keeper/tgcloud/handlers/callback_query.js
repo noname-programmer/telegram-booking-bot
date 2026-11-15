@@ -2,7 +2,7 @@
 
 import { api, BotApiError } from 'sdk';
 import { t, LANGS } from '../lib/i18n.js';
-import { getUser, setLang, setNotify, wipeUser } from '../lib/store.js';
+import { getUser, setLang, setNotify, wipeUser, setPin } from '../lib/store.js';
 import { send, menu, proScreen, langKeyboard, privacyScreen, wipeConfirm, nextNotify } from '../lib/ui.js';
 
 export default async function onCallback(query) {
@@ -11,6 +11,10 @@ export default async function onCallback(query) {
   const lang = user.lang;
   const data = String(query.data ?? '');
   let toast;
+  if (user.banned) {
+    try { await api.answerCallbackQuery({ callback_query_id: query.id, text: t(lang, 'banned') }); } catch (e) { if (!(e instanceof BotApiError)) throw e; }
+    return;
+  }
 
   if (data === 'pro') {
     const { text, ...extra } = await proScreen(user);
@@ -40,6 +44,11 @@ export default async function onCallback(query) {
   } else if (data === 'wipe:yes') {
     await wipeUser(user.id);
     await send(chatId, t(lang, 'wiped'));
+  } else if (data === 'pin:reset') {
+    // Сброс PIN-кода: вместе с ним стираются все сохранённые сообщения.
+    await wipeUser(user.id);
+    await setPin(user, null);
+    await send(chatId, t(lang, 'pinResetDone'));
   } else if (data === 'wipe:no') {
     toast = t(lang, 'cancelled');
   }

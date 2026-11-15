@@ -6,7 +6,7 @@
 import { api, BotApiError } from 'sdk';
 import { BOT_NAME, MINIAPP_URL, PRO, LIMITS, NOTIFY, OWNER_ID } from './config.js';
 import { t, LANGS } from './i18n.js';
-import { isPro, hasActiveConnection, digestTick } from './store.js';
+import { isPro, hasActiveConnection, digestTick, weeklyTick, clearVault } from './store.js';
 
 // Экранирует текст пользователя, чтобы он не сломал HTML-разметку.
 export const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -126,6 +126,40 @@ export async function sendMedia(chatId, row) {
     if (e instanceof BotApiError) return false;
     throw e;
   }
+}
+
+// Копирует файл удалённого сообщения в канал-«сейф» пользователя (если он его подключил и у него Pro или VIP).
+// Файл не скачивается: бот отправляет в канал ту же ссылку Telegram, поэтому это быстро при любом размере.
+const NO_CAPTION = ['sticker', 'video_note'];
+export async function vaultCopy(user, row, fileId = row.fileId, kind = row.kind) {
+  const method = SEND[kind];
+  if (!user.vaultId || !fileId || !method || !isPro(user)) return false;
+  const when = new Date((row.date + user.tz * 60) * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  const caption = `🗑 ${row.fromName} · ${when}${row.text ? `\n${row.text}` : ''}`.slice(0, 1000);
+  try {
+    await api[method]({ chat_id: user.vaultId, [kind]: fileId, ...(NO_CAPTION.includes(kind) ? {} : { caption }) });
+    return true;
+  } catch (e) {
+    if (!(e instanceof BotApiError)) throw e;
+    // Бота убрали из канала или канал удалён — отвязываем «сейф», чтобы не стучаться туда каждый раз.
+    if (e.code === 403 || /chat not found/i.test(e.description ?? '')) {
+      await clearVault(user.vaultId);
+      user.vaultId = null;
+    }
+    return false;
+  }
+}
+
+// Раз в неделю (при первом сообщении новой недели) присылает короткий отчёт за прошлую. Только Pro и VIP.
+export async function weeklyReport(user, chatId) {
+  if (!user.weekly || !isPro(user)) return;
+  const data = await weeklyTick(user);
+  if (!data) return;
+  const lang = user.lang;
+  const lines = [t(lang, 'weekTitle'), '', t(lang, 'weekTotals', data)];
+  if (data.top.length) lines.push('', t(lang, 'weekTop'), ...data.top.map(([name, n], i) => `${['🥇', '🥈', '🥉'][i]} ${esc(name)} — ${n}`));
+  if (data.hour !== null) lines.push('', t(lang, 'weekHour', { from: String(data.hour).padStart(2, '0'), to: String((data.hour + 1) % 24).padStart(2, '0') }));
+  await send(chatId, lines.join('\n'), openButton(lang));
 }
 
 // Текст о сообщении: вид (если это не просто текст) и содержимое.
