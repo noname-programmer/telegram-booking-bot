@@ -24,6 +24,10 @@
     --radius: 18px;
     --safe-b: env(safe-area-inset-bottom, 0px);
   }
+  /* Свои темы: пользователь может выбрать светлую или тёмную независимо от Telegram. */
+  :root[data-theme="light"] { --bg: #eff0f4; --card: #fff; --text: #0f1115; --hint: #8b8f99; --accent: #2f7cf6; --accent-text: #fff; --link: #2f7cf6; }
+  :root[data-theme="dark"] { --bg: #0e1014; --card: #1a1d24; --text: #f2f3f5; --hint: #8a909c; --accent: #6c8cff; --accent-text: #fff; --link: #8ea6ff;
+                             --line: rgba(160, 166, 180, .16); --soft: rgba(160, 166, 180, .13); }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; }
   body { background: var(--bg); color: var(--text); padding: 0 14px calc(92px + var(--safe-b));
@@ -238,6 +242,53 @@
   @keyframes up { from { transform: translateY(100%); } }
   .sheet h3 { margin: 0 0 2px; font-size: 18px; } .sheet p { margin: 0 0 14px; color: var(--hint); font-size: 13.5px; }
   .sheet .btn { width: 100%; margin-bottom: 8px; padding: 12px; }
+  /* ---------- сообщение-«пузырь» и история правок ---------- */
+  .bubble { white-space: pre-wrap; font-size: 15.5px; line-height: 1.45; padding: 9px 12px; border-radius: 4px 16px 16px 16px; background: var(--soft); }
+  .bubble.clamp { display: -webkit-box; -webkit-line-clamp: 9; -webkit-box-orient: vertical; overflow: hidden; }
+  .kindline { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 650; margin-bottom: 6px; padding: 3px 9px 3px 7px;
+              border-radius: 999px; background: var(--soft); }
+  .hist-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 750; letter-spacing: .4px; text-transform: uppercase;
+                color: var(--amber); margin: 2px 0 8px; }
+  .hist { position: relative; padding-left: 26px; }
+  .hist::before { content: ""; position: absolute; left: 8px; top: 10px; bottom: 14px; width: 2px; border-radius: 1px;
+                  background: linear-gradient(var(--line), var(--amber) 70%, var(--green)); }
+  .ver { position: relative; margin-bottom: 10px; }
+  .ver::before { content: ""; position: absolute; left: -23px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--card);
+                 border: 2.5px solid var(--hint); }
+  .ver.now::before { border-color: var(--green); background: var(--green); box-shadow: 0 0 0 4px rgba(47, 179, 106, .2); }
+  .ver-head { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--hint); margin-bottom: 4px; }
+  .ver.now .ver-head { color: var(--green); }
+  .ver-head time { font-weight: 600; opacity: .9; }
+  .ver .bubble { background: rgba(229, 72, 77, .08); color: var(--hint); font-size: 14.5px; }
+  .ver.now .bubble { background: rgba(47, 179, 106, .1); color: var(--text); font-size: 15.5px; }
+  .del-w { color: var(--red); background: rgba(229, 72, 77, .16); border-radius: 4px; text-decoration: line-through; text-decoration-thickness: 1.5px; padding: 0 1px; }
+  .add-w { color: var(--green); background: rgba(47, 179, 106, .2); border-radius: 4px; font-weight: 600; padding: 0 1px; }
+  .mini { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12.5px; font-weight: 650; padding: 5px 10px; border-radius: 9px;
+          background: var(--soft); color: var(--link); }
+  /* ---------- карточка файла ---------- */
+  .filecard { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 10px 12px; border-radius: 14px; background: var(--soft); }
+  .filecard .ext { flex: none; width: 46px; height: 54px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800;
+                   letter-spacing: .3px; background: #7a8194; position: relative; overflow: hidden; }
+  .filecard .ext::after { content: ""; position: absolute; top: 0; right: 0; border-width: 0 13px 13px 0; border-style: solid;
+                          border-color: transparent var(--card) rgba(255, 255, 255, .35) transparent; }
+  .filecard .ext img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .filecard .info { min-width: 0; flex: 1; }
+  .filecard .info b { display: block; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .filecard .info span { font-size: 12.5px; color: var(--hint); }
+  .media img { cursor: zoom-in; }
+  /* ---------- просмотр фото и видео на весь экран ---------- */
+  .viewer { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; animation: fade .15s; touch-action: none; }
+  .viewer .stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; }
+  .viewer .stage img, .viewer .stage video { max-width: 100%; max-height: 100%; object-fit: contain; will-change: transform; user-select: none; -webkit-user-drag: none; }
+  .viewer .bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: #fff; position: absolute; left: 0; right: 0; top: 0; z-index: 1;
+                 background: linear-gradient(rgba(0, 0, 0, .65), transparent); }
+  .viewer .bar div { flex: 1; min-width: 0; } .viewer .bar b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .viewer .bar span { font-size: 12.5px; opacity: .75; }
+  .viewer .x { width: 38px; height: 38px; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; flex: none; }
+  .viewer .foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 14px 14px calc(14px + var(--safe-b)); color: #fff;
+                  background: linear-gradient(transparent, rgba(0, 0, 0, .7)); }
+  .viewer .foot p { margin: 0 0 10px; font-size: 14px; max-height: 4.2em; overflow: auto; white-space: pre-wrap; }
+  .viewer .foot .btn { width: 100%; background: rgba(255, 255, 255, .16); color: #fff; }
   .toast { position: fixed; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); z-index: 9; max-width: 86%;
            background: rgba(20, 22, 28, .92); color: #fff; padding: 9px 15px; border-radius: 12px; font-size: 13.5px; text-align: center; animation: fade .2s; }
 </style>
@@ -308,6 +359,9 @@ const TEXTS = {
     bcTitle: 'Рассылка', bcHint: 'Сообщение получат все, кто запускал бота.', bcPlaceholder: 'Текст сообщения', bcSend: 'Разослать всем',
     bcAsk: 'Отправить это сообщение всем пользователям ({n})?', bcDone: 'Доставлено: {s}, не доставлено: {f}', bcProgress: 'Отправляю… {s}',
     findUser: 'Поиск по имени или ID', aOwner: 'ВЛАДЕЛЕЦ', close: 'Закрыть',
+    theme: 'Оформление', themes: ['Как в Telegram', 'Светлая', 'Тёмная'],
+    history: 'История правок', vWas: 'Было', vNow: 'Сейчас', vStep: 'Версия {n}', oldFile: 'Показать прежний файл', oldFileChat: 'Прежний файл — в чат',
+    getFile: 'Получить файл в чате', bigFile: 'Большой файл: откроется в чате с ботом',
     cancel: 'Отмена', error: 'Не получилось загрузить', retry: 'Повторить', today: 'Сегодня', yesterday: 'Вчера',
     units: { s: 'с', m: 'мин', h: 'ч', d: 'дн' },
     kinds: { text: 'Текст', photo: 'Фото', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое', audio: 'Аудио', document: 'Файл', animation: 'GIF', sticker: 'Стикер', other: 'Другое' },
@@ -365,6 +419,9 @@ const TEXTS = {
     bcTitle: 'Xabar tarqatish', bcHint: 'Xabarni botni ishga tushirgan hamma oladi.', bcPlaceholder: 'Xabar matni', bcSend: 'Hammaga yuborish',
     bcAsk: 'Bu xabar barcha foydalanuvchilarga ({n}) yuborilsinmi?', bcDone: 'Yetkazildi: {s}, yetkazilmadi: {f}', bcProgress: 'Yuborilmoqda… {s}',
     findUser: "Ism yoki ID bo'yicha qidirish", aOwner: 'EGASI', close: 'Yopish',
+    theme: "Ko'rinish", themes: ['Telegramdagidek', "Yorug'", "Qorong'i"],
+    history: 'Tahrirlar tarixi', vWas: 'Avval', vNow: 'Hozir', vStep: '{n}-versiya', oldFile: "Avvalgi faylni ko'rsatish", oldFileChat: 'Avvalgi fayl — chatga',
+    getFile: 'Faylni chatda olish', bigFile: 'Katta fayl: bot bilan chatda ochiladi',
     cancel: 'Bekor qilish', error: "Yuklab bo'lmadi", retry: 'Qayta urinish', today: 'Bugun', yesterday: 'Kecha',
     units: { s: 's', m: 'daq', h: 'soat', d: 'kun' },
     kinds: { text: 'Matn', photo: 'Rasm', video: 'Video', video_note: 'Dumaloq video', voice: 'Ovozli xabar', audio: 'Audio', document: 'Fayl', animation: 'GIF', sticker: 'Stiker', other: 'Boshqa' },
@@ -422,6 +479,9 @@ const TEXTS = {
     bcTitle: 'Broadcast', bcHint: 'Everyone who started the bot gets the message.', bcPlaceholder: 'Message text', bcSend: 'Send to everyone',
     bcAsk: 'Send this message to all users ({n})?', bcDone: 'Delivered: {s}, not delivered: {f}', bcProgress: 'Sending… {s}',
     findUser: 'Search by name or ID', aOwner: 'OWNER', close: 'Close',
+    theme: 'Appearance', themes: ['Same as Telegram', 'Light', 'Dark'],
+    history: 'Edit history', vWas: 'Before', vNow: 'Now', vStep: 'Version {n}', oldFile: 'Show the previous file', oldFileChat: 'Previous file — to chat',
+    getFile: 'Get the file in chat', bigFile: 'Large file: it opens in the chat with the bot',
     cancel: 'Cancel', error: 'Could not load', retry: 'Try again', today: 'Today', yesterday: 'Yesterday',
     units: { s: 's', m: 'min', h: 'h', d: 'd' },
     kinds: { text: 'Text', photo: 'Photo', video: 'Video', video_note: 'Video message', voice: 'Voice message', audio: 'Audio', document: 'File', animation: 'GIF', sticker: 'Sticker', other: 'Other' },
@@ -455,6 +515,8 @@ const ICON = {
   download: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
   gift: '<path d="M4 11h16v9H4v-9ZM3 7h18v4H3V7ZM12 7v13M12 7c-1-3-5-3-5-.5S10 7 12 7Zm0 0c1-3 5-3 5-.5S14 7 12 7Z"/>',
   megaphone: '<path d="M4 10v4h3l8 5V5L7 10H4Z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.500 0 2-1 2-2 0-1.500 1-2 2.500-2H18a3 3 0 0 0 3-3c0-5-4-9-9-9Z"/><circle cx="7.500" cy="11" r="1"/><circle cx="10" cy="7.500" r="1"/><circle cx="15" cy="7.500" r="1"/>',
   crown: '<path d="M4 18h16M4 15l-1-8 5 4 4-6 4 6 5-4-1 8H4Z"/>',
 };
 const icon = (name, size) => svg(ICON[name], size);
@@ -465,7 +527,28 @@ const icon = (name, size) => svg(ICON[name], size);
 const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
-try { tg.setHeaderColor('secondary_bg_color'); tg.setBackgroundColor('secondary_bg_color'); } catch { /* старый Telegram */ }
+
+// Тема оформления: 'system' (как в Telegram), 'light' или 'dark'. Выбор хранится на устройстве.
+const THEME_BG = { light: '#eff0f4', dark: '#0e1014' };
+let theme = 'system';
+try { theme = localStorage.getItem('keeper-theme') || 'system'; } catch { /* хранилище недоступно */ }
+function applyTheme(next, save = false) {
+  theme = ['light', 'dark'].includes(next) ? next : 'system';
+  if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', theme);
+  try {
+    tg.setHeaderColor(theme === 'system' ? 'secondary_bg_color' : THEME_BG[theme]);
+    tg.setBackgroundColor(theme === 'system' ? 'secondary_bg_color' : THEME_BG[theme]);
+    if (tg.setBottomBarColor) tg.setBottomBarColor(theme === 'system' ? 'secondary_bg_color' : THEME_BG[theme]);
+  } catch { /* старый Telegram */ }
+  if (save) {
+    try { localStorage.setItem('keeper-theme', theme); } catch { /* не страшно */ }
+    try { tg.CloudStorage.setItem('theme', theme); } catch { /* не страшно */ }
+  }
+}
+applyTheme(theme);
+// Если на этом устройстве выбора ещё нет — берём тот, что сохранён в Telegram (общий для всех устройств).
+try { tg.CloudStorage.getItem('theme', (err, value) => { if (!err && value && value !== theme) { applyTheme(value); if (tab === 'me') showMe(); } }); } catch { /* нет облачного хранилища */ }
 
 const call = (name, input = {}) => new Promise((resolve, reject) => {
   tg.Serverless.call(name, input, (err, data) => (err ? reject(err) : resolve(data)));
@@ -564,7 +647,11 @@ function chrome() {
 
   if (openChat && tab === 'chats') { tg.BackButton.show(); } else { tg.BackButton.hide(); }
 }
-tg.BackButton.onClick(() => { openChat = null; go('chats'); });
+tg.BackButton.onClick(() => {
+  if (closeViewer()) return;       // сначала закрываем открытое фото или видео
+  openChat = null;
+  go('chats');
+});
 
 function planBadge(plan) {
   if (plan === 'owner') return h('span', { class: 'badge-vip' }, `👑 ${L.aOwner}`);
@@ -776,6 +863,38 @@ function events(items, withName) {
   return out;
 }
 
+const KIND_EMOJI = { text: '💬', photo: '🖼', video: '📹', video_note: '⭕', voice: '🎤', audio: '🎵', document: '📎', animation: '🎞', sticker: '🙂', other: '💬' };
+const kindLabel = (kind, meta = {}) => `${KIND_EMOJI[kind] || '💬'} ${[meta.type ? L.types[meta.type] : L.kinds[kind] || L.kinds.other, meta.emoji, meta.title].filter(Boolean).join(' · ')}`;
+
+// Сравнивает два текста по словам. Возвращает кусочки второго ('same' | 'add') или первого ('same' | 'del').
+function diffWords(a, b) {
+  const A = a.split(/(\s+)/); const B = b.split(/(\s+)/);
+  if (A.length > 400 || B.length > 400) return null; // слишком длинно — показываем без подсветки
+  const n = A.length; const m = B.length;
+  const lcs = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) lcs[i][j] = A[i] === B[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  const removed = []; const added = [];
+  let i = 0; let j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { removed.push([A[i], false]); added.push([B[j], false]); i++; j++; }
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) removed.push([A[i++], true]);
+    else added.push([B[j++], true]);
+  }
+  while (i < n) removed.push([A[i++], true]);
+  while (j < m) added.push([B[j++], true]);
+  return { removed, added };
+}
+// Текст с подсветкой: marks — пары [кусочек, выделить ли], cls — чем выделять.
+const marked = (marks, cls) => marks.map(([part, hit]) => (hit && part.trim() ? h('span', { class: cls }, part) : part));
+
+function textBlock(content, long) {
+  const node = h('div', { class: 'bubble clamp' }, content);
+  if (!long) return [node];
+  const more = h('button', { class: 'more', onclick: () => { node.classList.remove('clamp'); more.remove(); } }, L.more);
+  return [node, more];
+}
+const isLong = (text) => text.length > 420 || text.split('\n').length > 9;
+
 function eventCard(item, withName) {
   const meta = item.meta || {};
   const cls = item.deletedAt && item.editedAt ? 'both' : item.deletedAt ? 'deleted' : 'edited';
@@ -784,26 +903,40 @@ function eventCard(item, withName) {
   card.append(h('div', { class: 'ev-head' },
     withName && avatar(item.name, item.chatId, 'small'),
     withName && h('div', { class: 'who' }, item.name),
-    item.deletedAt && h('span', { class: 'tag red' }, L.tagDeleted),
-    item.editedAt && h('span', { class: 'tag amber' }, L.tagEdited),
+    item.deletedAt && h('span', { class: 'tag red' }, `🗑 ${L.tagDeleted}`),
+    item.editedAt && h('span', { class: 'tag amber' }, `✏️ ${L.tagEdited}`),
     h('time', { style: withName ? '' : 'margin-left:auto' }, clock(item.at))));
 
-  if (item.kind !== 'text') {
-    const label = meta.type ? L.types[meta.type] : L.kinds[item.kind] || L.kinds.other;
-    card.append(h('div', { class: 'kind' }, h('i', { html: icon('file', 15) }), [label, meta.emoji, meta.title].filter(Boolean).join(' · ')));
-  }
-  // Что было до правок — от самой старой версии к новой.
-  for (const v of item.versions) {
-    card.append(h('div', { class: 'was' }, h('small', {}, `${L.was} · ${stamp(v.at)}`), h('div', {}, v.text || '—')));
-  }
-  if (item.versions.length && item.text) card.append(h('div', { class: 'nowlabel' }, L.now));
-  if (item.text) {
-    const text = h('div', { class: 'text clamp' }, item.text);
-    card.append(text);
-    if (item.text.length > 420 || item.text.split('\n').length > 8) {
-      const more = h('button', { class: 'more', onclick: () => { text.classList.remove('clamp'); more.remove(); } }, L.more);
-      card.append(more);
-    }
+  if (item.kind !== 'text') card.append(h('div', { class: 'kindline' }, kindLabel(item.kind, meta)));
+
+  if (item.versions.length) {
+    // История правок: лента версий от самой старой к нынешней, изменённые слова подсвечены.
+    const texts = [...item.versions.map((v) => v.text), item.text];
+    const hist = h('div', { class: 'hist' });
+    item.versions.forEach((v, i) => {
+      const d = diffWords(texts[i], texts[i + 1]);
+      const ver = h('div', { class: 'ver' },
+        h('div', { class: 'ver-head' }, `📝 ${item.versions.length > 1 ? fill(L.vStep, { n: i + 1 }) : L.vWas}`, h('time', {}, `· ${stamp(i === 0 ? item.date : item.versions[i - 1].at)}`)),
+        v.kind && h('div', { class: 'kindline' }, kindLabel(v.kind)),
+        (v.text || !v.kind) && textBlock(d ? marked(d.removed, 'del-w') : (v.text || '—'), isLong(v.text)));
+      if (v.hasFile && me.pro) {
+        const visual = ['photo', 'video', 'video_note', 'animation'].includes(v.kind);
+        ver.append(h('button', { class: 'mini', onclick: async () => {
+          haptic();
+          if (!visual) { try { toast((await call('sendMedia', { id: item.id, edit: v.id })).message); } catch (err) { tg.showAlert(err.message || L.error); } return; }
+          toast(L.loadingMedia);
+          try { const { url } = await mediaUrl(item.id, false, v.id); openViewer({ type: v.kind === 'photo' ? 'image' : 'video', url, item, edit: v.id }); } catch (err) { tg.showAlert(err.message || L.mediaErr); }
+        } }, visual ? `👁 ${L.oldFile}` : `📥 ${L.oldFileChat}`));
+      }
+      hist.append(ver);
+    });
+    const last = diffWords(texts.at(-2), texts.at(-1));
+    hist.append(h('div', { class: 'ver now' },
+      h('div', { class: 'ver-head' }, `✅ ${L.vNow}`, h('time', {}, `· ${stamp(item.versions.at(-1).at)}`)),
+      textBlock(item.text ? (last ? marked(last.added, 'add-w') : item.text) : '—', isLong(item.text))));
+    card.append(h('div', { class: 'hist-title' }, `✏️ ${L.history} · ${item.versions.length}`), hist);
+  } else if (item.text) {
+    card.append(...textBlock(item.text, isLong(item.text)));
   }
 
   // Подробности: когда отправлено, когда удалено, сколько «прожило», данные файла и т. д.
@@ -826,15 +959,7 @@ function eventCard(item, withName) {
   card.append(facts);
 
   if (item.hasFile && me.pro) {
-    card.append(mediaBox(item));
-    const btn = h('button', { class: 'btn ghost' }, h('i', { html: icon('send', 16) }), L.toChat);
-    btn.onclick = async () => {
-      haptic('medium');
-      btn.disabled = true;
-      try { toast((await call('sendMedia', { id: item.id })).message); } catch (err) { tg.showAlert(err.message || L.error); }
-      btn.disabled = false;
-    };
-    card.append(btn);
+    card.append(mediaBox(item), toChatButton(item, L.getFile));
   } else if (item.hasFile) {
     card.append(h('div', { class: 'lock' }, L.fileLocked));
   }
@@ -843,10 +968,10 @@ function eventCard(item, withName) {
 
 // ---------- показ фото, видео и голосовых прямо в приложении ----------
 const mediaCache = new Map(); // чтобы не скачивать один файл дважды
-async function mediaUrl(id, thumb = false) {
-  const key = `${id}:${thumb}`;
+async function mediaUrl(id, thumb = false, edit = null) {
+  const key = `${id}:${thumb}:${edit}`;
   if (!mediaCache.has(key)) {
-    mediaCache.set(key, call('media', { id, thumb }).then((res) => {
+    mediaCache.set(key, call('media', { id, thumb, edit }).then((res) => {
       const raw = atob(res.data);
       const bytes = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
@@ -860,39 +985,151 @@ const lazy = new IntersectionObserver((entries) => {
   for (const e of entries) if (e.isIntersecting) { lazy.unobserve(e.target); e.target.load(); }
 }, { rootMargin: '300px' });
 
+function toChatButton(item, label, edit = null) {
+  const btn = h('button', { class: 'btn ghost' }, h('i', { html: icon('send', 16) }), label);
+  btn.onclick = async () => {
+    haptic('medium');
+    btn.disabled = true;
+    try { toast((await call('sendMedia', { id: item.id, edit })).message); } catch (err) { tg.showAlert(err.message || L.error); }
+    btn.disabled = false;
+  };
+  return btn;
+}
+
+// Просмотр на весь экран, как в чате: щипок — приблизить, двойное касание — приблизить и вернуть, крестик или «назад» — закрыть.
+let viewer = null;
+function closeViewer() {
+  if (!viewer) return false;
+  viewer.remove();
+  viewer = null;
+  chrome(); // вернуть кнопку «назад» в прежнее состояние
+  return true;
+}
+function openViewer({ type, url, item, edit = null }) {
+  closeViewer();
+  const media = type === 'image'
+    ? h('img', { src: url, alt: '', draggable: 'false' })
+    : h('video', { src: url, controls: '', autoplay: '', playsinline: '' });
+  const stage = h('div', { class: 'stage' }, media);
+  const bar = h('div', { class: 'bar' },
+    h('button', { class: 'x', html: icon('x', 20), onclick: closeViewer }),
+    h('div', {}, h('b', {}, item.name), h('span', {}, `${dayName(item.date)}, ${clock(item.date)}`)));
+  const foot = h('div', { class: 'foot' }, item.text && edit === null && h('p', {}, item.text), toChatButton(item, L.getFile, edit));
+  viewer = h('div', { class: 'viewer' }, bar, stage, foot);
+  document.body.append(viewer);
+  tg.BackButton.show();
+
+  if (type !== 'image') { media.onerror = () => { closeViewer(); tg.showAlert(L.mediaErr); }; return; }
+  // Жесты для фото.
+  let scale = 1; let x = 0; let y = 0; let start = null; let lastTap = 0;
+  const paint = (smooth) => {
+    const maxX = (stage.clientWidth * (scale - 1)) / 2; const maxY = (stage.clientHeight * (scale - 1)) / 2;
+    x = Math.max(-maxX, Math.min(maxX, x)); y = Math.max(-maxY, Math.min(maxY, y));
+    media.style.transition = smooth ? 'transform .2s' : 'none';
+    media.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    bar.style.opacity = foot.style.opacity = scale > 1 ? '0' : '1';
+    bar.style.pointerEvents = foot.style.pointerEvents = scale > 1 ? 'none' : '';
+  };
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) start = { d: dist(e.touches), scale };
+    else if (e.touches.length === 1) start = { px: e.touches[0].clientX, py: e.touches[0].clientY, x, y, moved: false };
+  }, { passive: true });
+  stage.addEventListener('touchmove', (e) => {
+    if (!start) return;
+    e.preventDefault();
+    if (e.touches.length === 2 && start.d) scale = Math.max(1, Math.min(6, start.scale * (dist(e.touches) / start.d)));
+    else if (e.touches.length === 1 && start.px !== undefined) {
+      const dx = e.touches[0].clientX - start.px; const dy = e.touches[0].clientY - start.py;
+      if (Math.abs(dx) + Math.abs(dy) > 8) start.moved = true;
+      if (scale > 1) { x = start.x + dx; y = start.y + dy; } else y = start.y + dy; // без увеличения — тянем вниз, чтобы закрыть
+    }
+    paint(false);
+  }, { passive: false });
+  stage.addEventListener('touchend', (e) => {
+    if (e.touches.length) { start = null; return; }
+    if (scale <= 1 && Math.abs(y) > 110) return closeViewer();
+    if (scale <= 1) { x = 0; y = 0; }
+    const tap = start && !start.moved && start.px !== undefined;
+    start = null;
+    if (tap) {
+      const t = Date.now();
+      if (t - lastTap < 300) { scale = scale > 1 ? 1 : 2.500; x = 0; y = 0; lastTap = 0; } else lastTap = t;
+    }
+    paint(true);
+  });
+  // На компьютере: двойной щелчок и колесо мыши.
+  stage.addEventListener('dblclick', () => { scale = scale > 1 ? 1 : 2.500; x = 0; y = 0; paint(true); });
+  stage.addEventListener('wheel', (e) => { e.preventDefault(); scale = Math.max(1, Math.min(6, scale * (e.deltaY < 0 ? 1.150 : 0.870))); paint(false); }, { passive: false });
+}
+
+// Значок файла по расширению: цвет и короткая подпись.
+const EXT_COLOR = { pdf: '#e5484d', doc: '#2f7cf6', docx: '#2f7cf6', rtf: '#2f7cf6', odt: '#2f7cf6', xls: '#2fb36a', xlsx: '#2fb36a', csv: '#2fb36a', ods: '#2fb36a',
+  ppt: '#f0731b', pptx: '#f0731b', zip: '#f7b500', rar: '#f7b500', '7z': '#f7b500', txt: '#7a8194', apk: '#22c1a3', mp3: '#7c5cff', mp4: '#7c5cff', mov: '#7c5cff',
+  jpg: '#22b8e6', jpeg: '#22b8e6', png: '#22b8e6', webp: '#22b8e6', heic: '#22b8e6', json: '#7a8194', html: '#f0731b', exe: '#e5484d' };
+function fileCard(item, fallback) {
+  const meta = item.meta || {};
+  const name = meta.fileName || meta.title || fallback;
+  const ext = (/\.([a-z0-9]{1,5})$/i.exec(meta.fileName || '')?.[1] || (meta.mime || '').split('/')[1] || 'file').toLowerCase().slice(0, 4);
+  const tile = h('div', { class: 'ext', style: `background:${EXT_COLOR[ext] || '#7a8194'}` }, ext.toUpperCase());
+  if (item.hasThumb) {
+    tile.load = () => mediaUrl(item.id, true).then(({ url }) => tile.replaceChildren(h('img', { src: url, alt: '' })), () => {});
+    lazy.observe(tile);
+  }
+  return h('div', { class: 'filecard' }, tile,
+    h('div', { class: 'info' }, h('b', {}, name),
+      h('span', {}, [meta.size && bytes(meta.size), meta.duration && mmss(meta.duration), ext.toUpperCase()].filter(Boolean).join(' · '))));
+}
+
 function mediaBox(item) {
   const meta = item.meta || {};
   const big = (meta.size || 0) > (me.inlineMedia || 0);
   const kind = item.kind;
-  const isImage = kind === 'photo' || (kind === 'sticker' && meta.sticker !== 'video' && meta.sticker !== 'animated') || (kind === 'document' && /^image\//.test(meta.mime || ''));
+  const isImage = kind === 'photo' || (kind === 'sticker' && meta.sticker !== 'video' && meta.sticker !== 'animated') || (kind === 'document' && /^image\/(jpeg|png|webp|gif)/.test(meta.mime || ''));
   const isVideo = ['video', 'video_note', 'animation'].includes(kind) || (kind === 'sticker' && meta.sticker === 'video');
   const isAudio = kind === 'voice' || kind === 'audio';
+  // Документы (PDF, Excel, архивы…) и всё, что слишком велико для показа здесь, — карточкой файла.
+  if (big || !(isImage || isVideo || isAudio)) return fileCard(item, L.kinds[kind] || L.kinds.other);
+
   const box = h('div', { class: `media${kind === 'video_note' ? ' round' : ''}${kind === 'sticker' ? ' sticker' : ''}` });
   const wait = () => box.replaceChildren(h('div', { class: 'wait' }, L.loadingMedia));
   const fail = (err) => box.replaceChildren(h('div', { class: 'wait' }, err?.message && err.type === 'ENDPOINT_ERROR' ? err.message : L.mediaErr));
+  const inline = kind === 'sticker' || kind === 'animation'; // стикеры и GIF играют прямо в карточке
 
-  if (isImage && !big) {
+  if (isImage) {
     wait();
-    box.load = () => mediaUrl(item.id).then(({ url }) => box.replaceChildren(h('img', { src: url, alt: '' })), fail);
+    box.load = () => mediaUrl(item.id).then(({ url }) => {
+      const img = h('img', { src: url, alt: '' });
+      if (kind !== 'sticker') img.onclick = () => { haptic(); openViewer({ type: 'image', url, item }); };
+      box.replaceChildren(img);
+    }, fail);
     lazy.observe(box);
-  } else if (isVideo && !big) {
-    const play = () => {
+  } else if (isVideo) {
+    const button = h('button', { class: 'play' }, h('i', { html: icon('play', 24) }));
+    const restore = () => box.replaceChildren(...kept);
+    let kept = [button];
+    button.onclick = () => {
+      haptic();
       wait();
       mediaUrl(item.id).then(({ url }) => {
-        const video = h('video', { src: url, controls: '', autoplay: '', playsinline: '', loop: kind === 'animation' || kind === 'sticker' ? '' : null });
-        video.muted = kind === 'animation' || kind === 'sticker';
+        if (!inline) { restore(); return openViewer({ type: 'video', url, item }); }
+        const video = h('video', { src: url, autoplay: '', playsinline: '', loop: '' });
+        video.muted = true;
         video.onerror = () => fail();
         box.replaceChildren(video);
       }, fail);
     };
-    const button = h('button', { class: 'play', onclick: () => { haptic(); play(); } }, h('i', { html: icon('play', 24) }));
     box.style.minHeight = '150px';
     box.append(button);
     if (item.hasThumb) {
-      box.load = () => mediaUrl(item.id, true).then(({ url }) => { if (button.isConnected) box.prepend(h('img', { src: url, alt: '' })); }, () => {});
+      box.load = () => mediaUrl(item.id, true).then(({ url }) => {
+        const img = h('img', { src: url, alt: '', style: 'cursor:pointer' });
+        kept = [img, button];
+        if (button.isConnected) box.prepend(img);
+      }, () => {});
       lazy.observe(box);
     }
-  } else if (isAudio && !big) {
+  } else {
     box.append(h('button', { class: 'listen', onclick: () => {
       haptic();
       wait();
@@ -902,8 +1139,6 @@ function mediaBox(item) {
         box.replaceChildren(audio);
       }, fail);
     } }, h('i', { html: icon('play', 16) }), `${L.listen}${meta.duration ? ` · ${mmss(meta.duration)}` : ''}`));
-  } else {
-    return h('div', { class: 'lock' }, [meta.fileName, meta.size && bytes(meta.size)].filter(Boolean).join(' · '));
   }
   return box;
 }
@@ -1026,6 +1261,10 @@ async function showMe() {
           h('button', { class: 'btn primary', onclick: () => { haptic(); tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(L.shareText)}`); } }, h('i', { html: icon('send', 16) }), L.shareBtn),
           h('button', { class: 'btn', onclick: copy }, L.copy))),
     ],
+    h('div', { class: 'section' }, L.theme),
+    h('div', { class: 'seg' }, ['system', 'light', 'dark'].map((key, i) => h('button', {
+      class: key === theme ? 'on' : '', onclick: () => { haptic(); applyTheme(key, true); showMe(); },
+    }, L.themes[i]))),
     h('div', { class: 'section' }, L.tabs.me),
     h('div', { class: 'card' },
       h('div', { class: 'opt' },

@@ -275,7 +275,10 @@ export async function markDeleted(connId, chatId, ids) {
   const all = await db.select().from(messages).where(where).orderBy(asc(messages.messageId)).all();
   const rows = all.filter((r) => r.deletedAt === null || r.deletedAt === undefined);
   if (rows.length) {
-    await db.update(messages).set({ deletedAt: now() }).where(inArray(messages.id, rows.map((r) => r.id))).run();
+    // Часы Telegram и сервера могут расходиться на минуту: удалить раньше, чем отправить, нельзя.
+    const at = Math.max(now(), ...rows.map((r) => r.date));
+    await db.update(messages).set({ deletedAt: at }).where(inArray(messages.id, rows.map((r) => r.id))).run();
+    for (const r of rows) r.deletedAt = at;
   }
   return rows;
 }
@@ -284,8 +287,13 @@ export async function markDeleted(connId, chatId, ids) {
 export async function recordEdit(row, m) {
   const d = describe(m);
   if (d.text === row.text && d.fileId === row.fileId) return false;
-  const at = now();
-  await db.insert(edits).values({ msgId: row.id, ownerId: row.ownerId, oldText: row.text, at }).run();
+  // Время правки берём у Telegram; если его нет — своё. Раньше отправки оно быть не может.
+  const at = Math.max(m.edit_date ?? now(), row.date);
+  await db.insert(edits).values({
+    msgId: row.id, ownerId: row.ownerId, oldText: row.text, oldKind: row.kind,
+    oldFileId: d.fileId !== row.fileId ? row.fileId : null, // файл заменили — прежний не теряем
+    at,
+  }).run();
   await db.update(messages).set({ ...d, meta: details(m), editedAt: at }).where(eq(messages.id, row.id)).run();
   return d;
 }
@@ -323,7 +331,8 @@ export async function feed(ownerId, { type = 'all', chatId = null, q = '', limit
   return rows.map((r) => ({
     ...r,
     at: type === 'deleted' ? r.deletedAt : type === 'edited' ? r.editedAt : eventAt(r),
-    versions: history.filter((e) => e.msgId === r.id).map((e) => ({ text: e.oldText, at: e.at })),
+    versions: history.filter((e) => e.msgId === r.id)
+      .map((e) => ({ id: e.id, text: e.oldText, at: e.at, kind: e.oldKind ?? r.kind, hasFile: Boolean(e.oldFileId) })),
   }));
 }
 
@@ -342,6 +351,17 @@ export async function chatHistory(ownerId, chatId, limit) {
 
 export async function getOwnMessage(ownerId, id) {
   return db.select().from(messages).where(and(eq(messages.id, id), eq(messages.ownerId, ownerId))).get();
+}
+
+// Файл для показа или отправки: сам файл сообщения либо прежний файл из правки (editId).
+// Возвращает { kind, fileId, meta } или null. Чужую запись получить нельзя.
+export async function getOwnFile(ownerId, id, editId = null) {
+  const row = await getOwnMessage(ownerId, id);
+  if (!row) return null;
+  if (editId === null) return row.fileId ? { kind: row.kind, fileId: row.fileId, meta: row.meta } : null;
+  const edit = await db.select().from(edits)
+    .where(and(eq(edits.id, editId), eq(edits.msgId, row.id), eq(edits.ownerId, ownerId))).get();
+  return edit?.oldFileId ? { kind: edit.oldKind ?? 'document', fileId: edit.oldFileId, meta: null } : null;
 }
 
 // ---------- удаление данных ----------

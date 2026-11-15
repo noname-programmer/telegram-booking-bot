@@ -192,6 +192,8 @@ The platform manages the bot's webhook for you, derived from your deployed
 - Notifications go through `announce()` in `lib/ui.js`. `users.notify` is a mode from `NOTIFY` in `lib/config.js`
   (0 quiet — the default for new users, 1 full, 2 short, 3 one message a day); `chats.muted`, `chats.fav` and
   `users.favOnly` narrow it. Handlers always save and count; `announce()` only decides whether to message the owner.
+- Files are never downloaded when a message is saved (only `file_id` is stored). The `media` endpoint is the only place
+  that reads file bytes: keep the size check before reading and the capped streaming loop.
 - Pro = paid or trial (`users.proUntil`) or VIP (`users.vip`); always check with `isPro(user)`. `OWNER_ID` gets VIP
   automatically in `getUser`. Only admins may grant VIP (`/vip`, `admin` endpoint).
 - The schema default of `users.notify` is still 1 (the platform cannot change a column default); `getUser` writes 0.

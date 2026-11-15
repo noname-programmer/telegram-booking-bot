@@ -87,6 +87,8 @@ export const edits = table('edits', {
   msgId:   integer('msg_id').notNull(),               // messages.id
   ownerId: integer('owner_id').notNull(),
   oldText: text('old_text').notNull().default(''),
+  oldKind: text('old_kind'),                          // каким было сообщение: 'text' | 'photo' | ...
+  oldFileId: text('old_file_id'),                     // прежний файл, если при правке его заменили
   at:      integer('at').notNull(),
 }, (t) => ({
   byMsg: index('idx_edits_msg').on(t.msgId),

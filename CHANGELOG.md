@@ -22,6 +22,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Keeper: owner with permanent VIP (`OWNER_ID`), VIP for trusted people (admin panel or `/vip <id>`), a 3-day Pro
   trial, invite links (+7 days of Pro), Pro payment inside the Mini App, text search, export of a conversation
   to a file, admin broadcast and a start → connect → pay funnel.
+- Keeper Mini App: light / dark / Telegram theme, full-screen photo and video viewer with pinch zoom, edit history as a
+  timeline with word-level highlighting, file cards for documents. A file replaced by an edit is kept
+  (`edits.old_file_id`). The `media` endpoint reads files as a stream with a size cap. "Deleted" time can no longer be
+  earlier than "sent".
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).

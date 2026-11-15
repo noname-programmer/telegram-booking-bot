@@ -486,14 +486,71 @@ await step('С Pro: фото и голосовое открываются пря
   const photo = items.find((i) => i.kind === 'photo');
   assert.deepEqual(await mediaEndpoint({ id: voice.id }, ctx(OWNER)), { mime: 'audio/ogg', data: 'SGkh' });
   assert.equal((await mediaEndpoint({ id: photo.id }, ctx(OWNER))).mime, 'image/jpeg');
-  assert.equal(sent(take(), 'getFileContent')[0].params, 'voice-1');
+  assert.equal(sent(take(), 'getFileStream')[0].params, 'voice-1');
   await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OTHER)));        // чужой файл
   await assert.rejects(() => mediaEndpoint({ id: voice.id, thumb: true }, ctx(OWNER))); // превью нет
   sqlite.prepare("update messages set meta = ? where id = ?").run(JSON.stringify({ size: LIMITS.inlineMedia + 1 }), voice.id);
   await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)));        // слишком большой
   sqlite.prepare('update messages set meta = null where id = ?').run(voice.id);
-  failures.rule = (method) => (method === 'getFileContent' ? new BotApiError(method, 400, 'file is too old') : undefined);
+  failures.fileSize = LIMITS.inlineMedia + 1;                                     // размер неизвестен заранее, но Telegram говорит: большой
+  await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)), /слишком большой/);
+  failures.fileSize = null;
+  failures.rule = (method) => (method === 'getFileStream' ? new BotApiError(method, 400, 'file is too old') : undefined);
   await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)));        // Telegram файл уже не отдаёт
+});
+
+await step('Документы (PDF, Excel и любые файлы) сохраняются с именем и размером и приходят в чат', async () => {
+  const m = biz({ document: { file_id: 'doc-1', file_name: 'Отчёт 2026.xlsx', file_size: 52_000_000,
+    mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', thumbnail: { file_id: 'doc-thumb' } }, caption: 'смета' });
+  await onBizMessage(m);
+  await del([m.message_id]);
+  take();
+  const { items } = await feedEndpoint({ type: 'deleted', chatId: FRIEND }, ctx(OWNER));
+  const doc = items.find((i) => i.kind === 'document');
+  assert.equal(doc.meta.fileName, 'Отчёт 2026.xlsx');
+  assert.equal(doc.meta.size, 52_000_000);
+  assert.equal(doc.hasThumb, true);
+  assert.doesNotMatch(JSON.stringify(doc), /doc-thumb|doc-1/);                    // ссылки на файлы наружу не уходят
+  await assert.rejects(() => mediaEndpoint({ id: doc.id }, ctx(OWNER)), /слишком большой/); // 52 МБ в приложение не качаем
+  assert.equal(sent(take(), 'getFileStream').length, 0);                          // и даже не начинаем
+  assert.equal((await mediaEndpoint({ id: doc.id, thumb: true }, ctx(OWNER))).mime, 'image/jpeg');
+  await sendMediaEndpoint({ id: doc.id }, ctx(OWNER));                            // а в чат файл приходит любого размера
+  assert.equal(sent(take(), 'sendDocument')[0].params.document, 'doc-1');
+  sqlite.prepare('delete from messages where message_id = ?').run(m.message_id);
+});
+
+await step('При правке заменили файл → прежний файл не теряется', async () => {
+  const m = biz({ photo: [{ file_id: 'old-photo' }], caption: 'было фото' });
+  await onBizMessage(m);
+  await onBizEdited({ ...m, photo: undefined, video: { file_id: 'new-video' }, caption: 'стало видео', edit_date: m.date + 60 });
+  take();
+  const { items } = await feedEndpoint({ type: 'edited', chatId: FRIEND }, ctx(OWNER));
+  const item = items.find((i) => i.text === 'стало видео');
+  assert.equal(item.kind, 'video');
+  assert.equal(item.editedAt, m.date + 60);                                       // время правки — от Telegram
+  const [v] = item.versions;
+  assert.deepEqual([v.text, v.kind, v.hasFile], ['было фото', 'photo', true]);
+  assert.equal((await mediaEndpoint({ id: item.id, edit: v.id }, ctx(OWNER))).mime, 'image/jpeg');
+  assert.equal(sent(take(), 'getFileStream')[0].params, 'old-photo');
+  await sendMediaEndpoint({ id: item.id, edit: v.id }, ctx(OWNER));
+  assert.equal(sent(take(), 'sendPhoto')[0].params.photo, 'old-photo');
+  await assert.rejects(() => mediaEndpoint({ id: item.id, edit: 999999 }, ctx(OWNER)));
+  givePro(OTHER);
+  await assert.rejects(() => mediaEndpoint({ id: item.id, edit: v.id }, ctx(OTHER))); // чужая правка
+  givePro(OTHER, 0);
+  sqlite.prepare("delete from edits where msg_id in (select id from messages where message_id = ?)").run(m.message_id);
+  sqlite.prepare('delete from messages where message_id = ?').run(m.message_id);
+});
+
+await step('Часы Telegram спешат → «удалено» не раньше, чем «отправлено»', async () => {
+  const m = { ...biz({ text: 'из будущего' }), date: now() + 90 };
+  await onBizMessage(m);
+  await del([m.message_id]);
+  take();
+  const { items } = await feedEndpoint({ type: 'deleted', chatId: FRIEND }, ctx(OWNER));
+  const item = items.find((i) => i.text === 'из будущего');
+  assert.ok(item.deletedAt >= item.date);
+  sqlite.prepare('delete from messages where message_id = ?').run(m.message_id);
 });
 
 await step('С Pro: выгрузка переписки с собеседником приходит файлом', async () => {
