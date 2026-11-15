@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keeper</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* Цвета берём из темы Telegram пользователя (светлая или тёмная). */
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
+    --card: var(--tg-theme-bg-color, #fff);
+    --text: var(--tg-theme-text-color, #111);
+    --hint: var(--tg-theme-hint-color, #8a8a8f);
+    --accent: var(--tg-theme-button-color, #2481cc);
+    --accent-text: var(--tg-theme-button-text-color, #fff);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 12px 16px 32px; background: var(--bg); color: var(--text);
+         font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+  .tabs { display: flex; gap: 6px; background: var(--card); padding: 4px; border-radius: 12px; margin-bottom: 12px; }
+  .tabs button { flex: 1; border: 0; background: none; color: var(--hint); padding: 9px 4px; border-radius: 9px;
+                 font: inherit; font-weight: 600; }
+  .tabs button.on { background: var(--accent); color: var(--accent-text); }
+  .card { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; }
+  .head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .time { color: var(--hint); font-size: 13px; white-space: nowrap; }
+  .kind { color: var(--hint); font-size: 13px; }
+  .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .old { color: var(--hint); text-decoration: line-through; white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 4px; }
+  .file { margin-top: 8px; border: 0; border-radius: 9px; padding: 7px 12px; font: inherit; font-size: 14px;
+          background: var(--accent); color: var(--accent-text); }
+  .note { color: var(--hint); text-align: center; padding: 28px 12px; }
+  .banner { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="tabs">
+  <button id="tab-deleted" class="on"></button>
+  <button id="tab-edited"></button>
+</div>
+<div id="banner"></div>
+<div id="list"></div>
+
+<script>
+// Тексты мини-приложения на трёх языках.
+const TEXTS = {
+  ru: { deleted: 'Удалённые', edited: 'Изменённые', empty: 'Пока пусто. Когда собеседник удалит или изменит сообщение, оно появится здесь.',
+        off: 'Бот не подключён к аккаунту. Откройте чат с ботом и нажмите /start — там инструкция.',
+        free: 'Бесплатный тариф: видны последние {n} записей, без файлов. Pro: команда /pro в чате с ботом.',
+        file: 'Прислать файл в чат', loading: 'Загрузка…', error: 'Не получилось загрузить. Попробуйте ещё раз.',
+        kinds: { photo: '🖼 Фото', video: '🎬 Видео', video_note: '⏺ Кружок', voice: '🎤 Голосовое', audio: '🎵 Аудио',
+                 document: '📎 Файл', animation: '🎞 GIF', sticker: '🙂 Стикер', other: '💬 Сообщение' } },
+  uz: { deleted: "O'chirilgan", edited: "O'zgartirilgan", empty: "Hozircha bo'sh. Suhbatdosh xabarni o'chirsa yoki o'zgartirsa, u shu yerda paydo bo'ladi.",
+        off: "Bot akkauntga ulanmagan. Bot bilan chatni oching va /start ni bosing — u yerda yo'riqnoma bor.",
+        free: "Bepul tarif: oxirgi {n} ta yozuv ko'rinadi, fayllarsiz. Pro: bot bilan chatda /pro buyrug'i.",
+        file: 'Faylni chatga yuborish', loading: 'Yuklanmoqda…', error: "Yuklab bo'lmadi. Qayta urinib ko'ring.",
+        kinds: { photo: '🖼 Rasm', video: '🎬 Video', video_note: '⏺ Dumaloq video', voice: '🎤 Ovozli xabar', audio: '🎵 Audio',
+                 document: '📎 Fayl', animation: '🎞 GIF', sticker: '🙂 Stiker', other: '💬 Xabar' } },
+  en: { deleted: 'Deleted', edited: 'Edited', empty: 'Nothing yet. When someone deletes or edits a message, it will appear here.',
+        off: 'The bot is not connected to your account. Open the chat with the bot and send /start for instructions.',
+        free: 'Free plan: the last {n} records, without files. Pro: send /pro in the chat with the bot.',
+        file: 'Send the file to chat', loading: 'Loading…', error: 'Could not load. Please try again.',
+        kinds: { photo: '🖼 Photo', video: '🎬 Video', video_note: '⏺ Video message', voice: '🎤 Voice message', audio: '🎵 Audio',
+                 document: '📎 File', animation: '🎞 GIF', sticker: '🙂 Sticker', other: '💬 Message' } },
+};
+
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const guess = (tg.initDataUnsafe.user?.language_code || 'en').slice(0, 2);
+let L = TEXTS[guess] || TEXTS.en;
+let tab = 'deleted';
+const $ = (id) => document.getElementById(id);
+
+// Создаёт элемент с текстом. Текст вставляется как текст, а не как HTML — так безопасно.
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+const when = (unix) => new Date(unix * 1000).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+function labels() {
+  $('tab-deleted').textContent = L.deleted;
+  $('tab-edited').textContent = L.edited;
+}
+
+function render(data) {
+  L = TEXTS[data.lang] || L;
+  labels();
+  const banner = $('banner');
+  banner.replaceChildren();
+  if (!data.connected) banner.append(el('div', 'banner', L.off));
+  else if (!data.pro) banner.append(el('div', 'banner', L.free.replace('{n}', data.limit)));
+
+  const list = $('list');
+  list.replaceChildren();
+  if (!data.items.length) return list.append(el('div', 'note', L.empty));
+
+  for (const item of data.items) {
+    const card = el('div', 'card');
+    const head = el('div', 'head');
+    head.append(el('div', 'name', item.name), el('div', 'time', when(item.at)));
+    card.append(head);
+    if (item.kind !== 'text') card.append(el('div', 'kind', L.kinds[item.kind] || L.kinds.other));
+    for (const old of item.versions) card.append(el('div', 'old', old || '—'));
+    if (item.text) card.append(el('div', 'text', item.text));
+    if (item.hasFile && data.pro) {
+      const btn = el('button', 'file', L.file);
+      btn.onclick = () => {
+        btn.disabled = true;
+        tg.Serverless.call('sendMedia', { id: item.id }, (err, res) => {
+          btn.disabled = false;
+          tg.showAlert(err ? err.message : res.message);
+        });
+      };
+      card.append(btn);
+    }
+    list.append(card);
+  }
+}
+
+function load() {
+  $('list').replaceChildren(el('div', 'note', L.loading));
+  tg.Serverless.call('feed', { type: tab }, (err, data) => {
+    if (err) return $('list').replaceChildren(el('div', 'note', L.error));
+    render(data);
+  });
+}
+
+for (const name of ['deleted', 'edited']) {
+  $(`tab-${name}`).onclick = () => {
+    tab = name;
+    $('tab-deleted').classList.toggle('on', name === 'deleted');
+    $('tab-edited').classList.toggle('on', name === 'edited');
+    load();
+  };
+}
+
+labels();
+load();
+</script>
+</body>
+</html>

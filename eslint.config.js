@@ -19,7 +19,7 @@ export default [
     },
   },
   // Код бота работает в песочнице Telegram: только стандартный JavaScript, без Node.js.
-  { files: ['tgcloud/**/*.js', 'examples/**/*.js'], languageOptions: { globals: { console: 'readonly' } } },
+  { files: ['tgcloud/**/*.js', 'keeper/tgcloud/**/*.js', 'examples/**/*.js'], languageOptions: { globals: { console: 'readonly' } } },
   // Тесты и запуск без Serverless работают в Node.js.
   { files: ['test/**/*.js', 'standalone/**/*.js', 'eslint.config.js'], languageOptions: { globals: globals.node } },
 ];

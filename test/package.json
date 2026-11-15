@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node all.js",
-    "one": "node --import ./register.js run.js"
+    "one": "node --import ./register.js run.js",
+    "keeper": "node --import ./register.js keeper.js"
   },
   "devDependencies": {
     "better-sqlite3": "^13.0.3",

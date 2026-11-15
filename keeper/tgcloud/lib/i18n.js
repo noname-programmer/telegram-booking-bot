@@ -1,0 +1,167 @@
+// lib/i18n.js — все тексты бота на трёх языках.
+// {name} в тексте — место, куда подставляется значение: t('ru', 'deleted', { name: 'Али' }).
+
+import { DEFAULT_LANG } from './config.js';
+
+export const LANGS = { ru: 'Русский', uz: "O'zbekcha", en: 'English' };
+
+const T = {
+  ru: {
+    start: '👋 <b>{bot}</b> показывает сообщения, которые собеседник удалил или изменил в личном чате с вами.\n\n'
+      + '<b>Как включить:</b>\n1. Настройки Telegram → «Telegram для бизнеса» → «Чат-боты».\n'
+      + '2. Впишите @{username} и разрешите доступ к личным чатам.\n\n'
+      + 'После этого бот начнёт присылать сюда удалённые и изменённые сообщения.',
+    statusOn: '✅ Бот подключён к вашему аккаунту.',
+    statusOff: '⚪️ Бот пока не подключён.',
+    planFree: 'Тариф: бесплатный (тексты, хранение {days} дн.)',
+    planPro: '⭐️ Pro активен до {date}',
+    btnHistory: '📂 История',
+    btnPro: '⭐️ Pro',
+    btnLang: '🌐 Язык',
+    btnPrivacy: '🔒 Мои данные',
+    connected: '✅ Подключено! Теперь я буду присылать сюда сообщения, которые собеседники удалят или изменят.',
+    disconnected: '⚪️ Бот отключён от аккаунта. Сохранённые сообщения удалены.',
+    deleted: '🗑 <b>{name}</b> удалил(а) сообщение:',
+    deletedMany: '🗑 <b>{name}</b> удалил(а) сообщений: {n}. Показываю первые {shown}.',
+    edited: '✏️ <b>{name}</b> изменил(а) сообщение:',
+    was: 'Было:',
+    now: 'Стало:',
+    mediaLocked: '🔒 Сами файлы доступны в Pro: /pro',
+    kind_photo: '🖼 Фото', kind_video: '🎬 Видео', kind_video_note: '⏺ Кружок', kind_voice: '🎤 Голосовое',
+    kind_audio: '🎵 Аудио', kind_document: '📎 Файл', kind_animation: '🎞 GIF', kind_sticker: '🙂 Стикер',
+    kind_other: '💬 Сообщение',
+    proAbout: '⭐️ <b>Pro</b> — {stars} звёзд в месяц\n\n• удалённые фото, видео, голосовые и файлы\n'
+      + '• полная история в мини-приложении\n• хранение {proDays} дней вместо {freeDays}\n\n'
+      + 'Подписка продлевается автоматически, отменить можно в настройках Telegram.',
+    proTitle: 'Подписка Pro',
+    proDesc: 'Удалённые медиа, полная история и хранение {proDays} дней.',
+    btnPay: 'Оплатить ⭐️ {stars}',
+    proThanks: '🎉 Pro включён до {date}. Спасибо!',
+    chooseLang: 'Выберите язык:',
+    langSet: 'Готово, язык: Русский.',
+    privacy: '🔒 <b>Ваши данные</b>\n\nБот хранит сообщения собеседников из ваших личных чатов: текст, время и ссылку на файл. '
+      + 'Свои сообщения и защищённый от копирования контент не сохраняются. Срок хранения: {freeDays} дн. бесплатно, {proDays} дн. в Pro, потом записи стираются. '
+      + 'При отключении бота всё удаляется сразу.',
+    btnWipe: '🗑 Удалить всё сейчас',
+    wipeAsk: 'Удалить все сохранённые сообщения? Вернуть их будет нельзя.',
+    btnYes: 'Да, удалить',
+    btnNo: 'Отмена',
+    wiped: 'Готово: все сохранённые сообщения удалены.',
+    cancelled: 'Отменено.',
+    needPro: 'Доступно в Pro.',
+    notFound: 'Запись не найдена.',
+    sent: 'Отправил в чат с ботом.',
+    stats: '📊 Пользователей: {users}\nПодключено: {conns}\nPro: {pro}\nСообщений в базе: {msgs}\nЗвёзд получено: {stars}',
+  },
+  uz: {
+    start: "👋 <b>{bot}</b> suhbatdoshingiz shaxsiy chatda o'chirgan yoki o'zgartirgan xabarlarni ko'rsatadi.\n\n"
+      + "<b>Qanday yoqiladi:</b>\n1. Telegram sozlamalari → «Telegram biznes uchun» → «Chat-botlar».\n"
+      + "2. @{username} ni yozing va shaxsiy chatlarga ruxsat bering.\n\n"
+      + "Shundan so'ng bot o'chirilgan va o'zgartirilgan xabarlarni shu yerga yuboradi.",
+    statusOn: '✅ Bot akkauntingizga ulangan.',
+    statusOff: '⚪️ Bot hali ulanmagan.',
+    planFree: 'Tarif: bepul (matnlar, {days} kun saqlanadi)',
+    planPro: '⭐️ Pro {date} gacha faol',
+    btnHistory: '📂 Tarix',
+    btnPro: '⭐️ Pro',
+    btnLang: '🌐 Til',
+    btnPrivacy: "🔒 Ma'lumotlarim",
+    connected: "✅ Ulandi! Endi suhbatdoshlar o'chirgan yoki o'zgartirgan xabarlarni shu yerga yuboraman.",
+    disconnected: "⚪️ Bot akkauntdan uzildi. Saqlangan xabarlar o'chirildi.",
+    deleted: "🗑 <b>{name}</b> xabarni o'chirdi:",
+    deletedMany: "🗑 <b>{name}</b> {n} ta xabarni o'chirdi. Birinchi {shown} tasini ko'rsataman.",
+    edited: "✏️ <b>{name}</b> xabarni o'zgartirdi:",
+    was: 'Avval:',
+    now: 'Hozir:',
+    mediaLocked: '🔒 Fayllarning o‘zi Pro tarifida: /pro',
+    kind_photo: '🖼 Rasm', kind_video: '🎬 Video', kind_video_note: '⏺ Dumaloq video', kind_voice: '🎤 Ovozli xabar',
+    kind_audio: '🎵 Audio', kind_document: '📎 Fayl', kind_animation: '🎞 GIF', kind_sticker: '🙂 Stiker',
+    kind_other: '💬 Xabar',
+    proAbout: "⭐️ <b>Pro</b> — oyiga {stars} yulduz\n\n• o'chirilgan rasm, video, ovozli xabar va fayllar\n"
+      + "• mini-ilovada to'liq tarix\n• {freeDays} kun o'rniga {proDays} kun saqlash\n\n"
+      + "Obuna avtomatik uzaytiriladi, uni Telegram sozlamalarida bekor qilish mumkin.",
+    proTitle: 'Pro obunasi',
+    proDesc: "O'chirilgan media, to'liq tarix va {proDays} kun saqlash.",
+    btnPay: "To'lash ⭐️ {stars}",
+    proThanks: '🎉 Pro {date} gacha yoqildi. Rahmat!',
+    chooseLang: 'Tilni tanlang:',
+    langSet: "Tayyor, til: O'zbekcha.",
+    privacy: "🔒 <b>Ma'lumotlaringiz</b>\n\nBot shaxsiy chatlaringizdagi suhbatdoshlar xabarlarini saqlaydi: matn, vaqt va fayl havolasi. "
+      + "O'z xabarlaringiz va nusxalashdan himoyalangan kontent saqlanmaydi. Saqlash muddati: bepul {freeDays} kun, Pro {proDays} kun, keyin yozuvlar o'chiriladi. "
+      + "Bot uzilganda hammasi darhol o'chiriladi.",
+    btnWipe: "🗑 Hozir hammasini o'chirish",
+    wipeAsk: "Barcha saqlangan xabarlar o'chirilsinmi? Ularni qaytarib bo'lmaydi.",
+    btnYes: "Ha, o'chirish",
+    btnNo: 'Bekor qilish',
+    wiped: "Tayyor: barcha saqlangan xabarlar o'chirildi.",
+    cancelled: 'Bekor qilindi.',
+    needPro: 'Pro tarifida mavjud.',
+    notFound: 'Yozuv topilmadi.',
+    sent: 'Bot bilan chatga yubordim.',
+    stats: "📊 Foydalanuvchilar: {users}\nUlangan: {conns}\nPro: {pro}\nBazadagi xabarlar: {msgs}\nOlingan yulduzlar: {stars}",
+  },
+  en: {
+    start: '👋 <b>{bot}</b> shows you messages that the other person deleted or edited in your private chats.\n\n'
+      + '<b>How to turn it on:</b>\n1. Telegram Settings → “Telegram Business” → “Chatbots”.\n'
+      + '2. Enter @{username} and allow access to private chats.\n\n'
+      + 'After that the bot sends deleted and edited messages here.',
+    statusOn: '✅ The bot is connected to your account.',
+    statusOff: '⚪️ The bot is not connected yet.',
+    planFree: 'Plan: free (text only, kept for {days} days)',
+    planPro: '⭐️ Pro is active until {date}',
+    btnHistory: '📂 History',
+    btnPro: '⭐️ Pro',
+    btnLang: '🌐 Language',
+    btnPrivacy: '🔒 My data',
+    connected: '✅ Connected! I will now send you messages that people delete or edit.',
+    disconnected: '⚪️ The bot was disconnected. Saved messages have been deleted.',
+    deleted: '🗑 <b>{name}</b> deleted a message:',
+    deletedMany: '🗑 <b>{name}</b> deleted {n} messages. Showing the first {shown}.',
+    edited: '✏️ <b>{name}</b> edited a message:',
+    was: 'Before:',
+    now: 'After:',
+    mediaLocked: '🔒 The files themselves are available in Pro: /pro',
+    kind_photo: '🖼 Photo', kind_video: '🎬 Video', kind_video_note: '⏺ Video message', kind_voice: '🎤 Voice message',
+    kind_audio: '🎵 Audio', kind_document: '📎 File', kind_animation: '🎞 GIF', kind_sticker: '🙂 Sticker',
+    kind_other: '💬 Message',
+    proAbout: '⭐️ <b>Pro</b> — {stars} Stars per month\n\n• deleted photos, videos, voice messages and files\n'
+      + '• full history in the Mini App\n• kept for {proDays} days instead of {freeDays}\n\n'
+      + 'The subscription renews automatically; you can cancel it in Telegram Settings.',
+    proTitle: 'Pro subscription',
+    proDesc: 'Deleted media, full history and {proDays}-day storage.',
+    btnPay: 'Pay ⭐️ {stars}',
+    proThanks: '🎉 Pro is on until {date}. Thank you!',
+    chooseLang: 'Choose a language:',
+    langSet: 'Done, language: English.',
+    privacy: '🔒 <b>Your data</b>\n\nThe bot stores messages from the people you chat with privately: text, time and a file reference. '
+      + 'Your own messages and copy-protected content are not saved. Storage time: {freeDays} days on the free plan, {proDays} days with Pro, then records are erased. '
+      + 'When you disconnect the bot, everything is deleted at once.',
+    btnWipe: '🗑 Delete everything now',
+    wipeAsk: 'Delete all saved messages? This cannot be undone.',
+    btnYes: 'Yes, delete',
+    btnNo: 'Cancel',
+    wiped: 'Done: all saved messages were deleted.',
+    cancelled: 'Cancelled.',
+    needPro: 'Available in Pro.',
+    notFound: 'Record not found.',
+    sent: 'Sent to your chat with the bot.',
+    stats: '📊 Users: {users}\nConnected: {conns}\nPro: {pro}\nMessages stored: {msgs}\nStars received: {stars}',
+  },
+};
+
+// Язык по языку Telegram пользователя: uz → узбекский, ru и соседние → русский, остальные → английский.
+export function pickLang(code) {
+  const c = String(code ?? '').slice(0, 2).toLowerCase();
+  if (c === 'uz') return 'uz';
+  if (['ru', 'uk', 'be', 'kk', 'ky', 'tg'].includes(c)) return 'ru';
+  return T[c] ? c : DEFAULT_LANG;
+}
+
+// Текст по ключу с подстановкой значений.
+export function t(lang, key, vars = {}) {
+  const text = (T[lang] ?? T[DEFAULT_LANG])[key] ?? T[DEFAULT_LANG][key] ?? key;
+  return text.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+}
+
+export const KEYS = Object.keys(T.ru);
+export const hasKey = (lang, key) => key in (T[lang] ?? {});

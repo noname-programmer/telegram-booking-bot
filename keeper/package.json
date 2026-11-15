@@ -1,0 +1,15 @@
+{
+  "name": "keeper-bot",
+  "version": "0.1.0",
+  "description": "Telegram bot that shows messages deleted or edited by the other person (Telegram Business + Serverless)",
+  "author": "Nizomiddin Nazarov",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "tgcloud push",
+    "status": "tgcloud status",
+    "migrate": "tgcloud migrate",
+    "test": "cd ../test && npm run keeper"
+  }
+}

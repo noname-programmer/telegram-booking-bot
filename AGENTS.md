@@ -176,3 +176,15 @@ The platform manages the bot's webhook for you, derived from your deployed
   register it in `HANDLERS` in `standalone/bot.js`. When you change `tgcloud/schema.js`, update
   `standalone/schema.sql` too (`npm test` fails if they diverge). `cd standalone && npm run smoke` is the end-to-end check.
 
+
+## Second bot in this repository: `keeper/`
+
+- `keeper/` is a separate tgcloud project (its own `tgcloud/`, `tgcloud.jsonc`, Mini App in `keeper/miniapp/`), deployed to
+  a different bot with the token variable `TGCLOUD_TOKEN_KEEPER`. See `keeper/README.md`.
+- **Before any `npx tgcloud` command in `keeper/`, run `mkdir -p keeper/.tgcloud`.** Without that folder the CLI walks up
+  and treats the root booking bot as the project, so a push would send the wrong code to the wrong bot.
+- It has no standalone runtime and no example configs. Its scenarios are `test/keeper.js` (`cd test && npm run keeper`,
+  also part of `npm test`); the test builds tables straight from `keeper/tgcloud/schema.js`.
+- All texts live in `keeper/tgcloud/lib/i18n.js` in three languages (ru, uz, en); a test fails if a key is missing in one.
+- It never stores the owner's own messages or protected content, and has no code to capture self-destructing media.
+  Keep it that way.
