@@ -4,7 +4,7 @@
 //   chatId: показать только одного собеседника (не обязательно)
 //   q:      поиск по тексту (не обязательно)
 
-import { feed, chatNames } from '../lib/store.js';
+import { feed, chatNames, pinnedOf } from '../lib/store.js';
 import { whoami, toItem } from '../lib/app.js';
 
 export default async function (input, ctx) {
@@ -16,5 +16,7 @@ export default async function (input, ctx) {
   const rows = await feed(user.id, { type, chatId, q, limit });
   // На странице собеседника заодно отдаём его прежние имена.
   const names = chatId === null ? [] : (await chatNames(user.id, chatId)).map((n) => ({ name: n.name, username: n.username, at: n.at }));
-  return { ...profile, items: rows.map(toItem), names };
+  // …и закреплённые сообщения (они показываются вверху страницы, независимо от фильтра и поиска).
+  const pinned = chatId === null ? [] : (await pinnedOf(user.id, chatId)).map(toItem);
+  return { ...profile, items: rows.map(toItem), names, pinned };
 }

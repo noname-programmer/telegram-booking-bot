@@ -66,6 +66,7 @@ export const messages = table('messages', {
   deletedAt: integer('deleted_at'),                   // когда удалено (пусто — не удалено)
   editedAt:  integer('edited_at'),                    // когда последний раз изменено
   kept:      integer('kept').notNull().default(0),    // 1 — закладка: не стирать по сроку хранения
+  pinned:    integer('pinned').notNull().default(0),  // когда закрепили (0 — не закреплено). Закреплённое видно вверху страницы собеседника
 }, (t) => ({
   oneMessage: uniqueIndex('uidx_messages_key').on(t.connId, t.chatId, t.messageId),
   byOwnerDeleted: index('idx_messages_owner_deleted').on(t.ownerId, t.deletedAt),
