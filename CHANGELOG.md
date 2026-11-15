@@ -12,6 +12,23 @@ and the project uses [Semantic Versioning](https://semver.org/).
   Russian / Uzbek / English. Scenarios in `test/keeper.js`.
   Deployed to @keepXsavebot; a long edited message no longer exceeds Telegram's 4096-character limit, and a repeated
   "deleted" event no longer notifies twice.
+- Keeper Mini App rebuilt: chats grouped by person, a feed, insights (14-day and hour-of-day charts, deletion speed,
+  top chats), profile with settings, and an admin panel for `ADMIN_IDS` (numbers and users only, gift or remove Pro).
+- Keeper: quiet mode and per-chat mute (events are collected in the Mini App without messages in the chat);
+  more data per message (sender, file size and duration, forward origin, edit history with times); `chats` table
+  with lifetime counters.
+- Keeper: quiet by default — nothing is sent to the chat; photos, videos and voice messages open inside the Mini App
+  (`media` endpoint). Notification modes: quiet / short / once a day / full, plus "favourites only".
+- Keeper: owner with permanent VIP (`OWNER_ID`), VIP for trusted people (admin panel or `/vip <id>`), a 3-day Pro
+  trial, invite links (+7 days of Pro), Pro payment inside the Mini App, text search, export of a conversation
+  to a file, admin broadcast and a start → connect → pay funnel.
+- Keeper Mini App: light / dark / Telegram theme, full-screen photo and video viewer with pinch zoom, edit history as a
+  timeline with word-level highlighting, file cards for documents. A file replaced by an edit is kept
+  (`edits.old_file_id`). The `media` endpoint reads files as a stream with a size cap. "Deleted" time can no longer be
+  earlier than "sent".
+- Keeper: a "safe" channel that receives copies of deleted files (`my_chat_member` handler), a media gallery,
+  bookmarks that survive retention, a server-checked PIN for the Mini App, promo codes, price and limits editable
+  from the admin panel (`settings` table), user blocking, a weekly report and a helper admin role without VIP rights.
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).

@@ -186,5 +186,21 @@ The platform manages the bot's webhook for you, derived from your deployed
 - It has no standalone runtime and no example configs. Its scenarios are `test/keeper.js` (`cd test && npm run keeper`,
   also part of `npm test`); the test builds tables straight from `keeper/tgcloud/schema.js`.
 - All texts live in `keeper/tgcloud/lib/i18n.js` in three languages (ru, uz, en); a test fails if a key is missing in one.
+- Mini App endpoints: `chats`, `feed`, `stats`, `settings`, `media`, `sendMedia`, `invoice`, `export`, `pin`, `promo`, `admin`. Each starts with `whoami(ctx, input)` from
+  `lib/app.js`; `admin` must call `requireAdmin` and must never return message text. The Mini App is one hand-written file,
+  `keeper/miniapp/index.html` (three languages inside, all user text inserted as text, never as HTML).
+- Notifications go through `announce()` in `lib/ui.js`. `users.notify` is a mode from `NOTIFY` in `lib/config.js`
+  (0 quiet — the default for new users, 1 full, 2 short, 3 one message a day); `chats.muted`, `chats.fav` and
+  `users.favOnly` narrow it. Handlers always save and count; `announce()` only decides whether to message the owner.
+- Files are never downloaded when a message is saved (only `file_id` is stored). The `media` endpoint is the only place
+  that reads file bytes: keep the size check before reading and the capped streaming loop.
+- `whoami(ctx, input)` also enforces the ban and the PIN (`input.pin`): never read user data in an endpoint before it.
+- Admin = `ADMIN_IDS` (owner) or `users.role = 'admin'` (helper): check with `isAdmin(user)`; owner-only actions
+  (VIP, broadcast, settings, roles) use `requireOwner`.
+- `PRO`, `REF` and `LIMITS` in `lib/config.js` are defaults: `loadSettings()` (called from `getUser`) overlays values
+  from the `settings` table, so read them at call time, never copy them into module-level constants.
+- Pro = paid or trial (`users.proUntil`) or VIP (`users.vip`); always check with `isPro(user)`. `OWNER_ID` gets VIP
+  automatically in `getUser`. Only admins may grant VIP (`/vip`, `admin` endpoint).
+- The schema default of `users.notify` is still 1 (the platform cannot change a column default); `getUser` writes 0.
 - It never stores the owner's own messages or protected content, and has no code to capture self-destructing media.
   Keep it that way.

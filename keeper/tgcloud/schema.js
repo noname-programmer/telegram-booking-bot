@@ -9,6 +9,29 @@ export const users = table('users', {
   id:       integer('id').primaryKey(),               // Telegram ID
   lang:     text('lang').notNull().default('en'),     // 'ru' | 'uz' | 'en'
   proUntil: integer('pro_until').notNull().default(0), // до какого времени оплачен Pro
+  name:     text('name').notNull().default(''),       // имя из Telegram (для админ-панели)
+  username: text('username').notNull().default(''),
+  // Режим уведомлений: 0 тихо, 1 полные, 2 короткие, 3 сводка раз в день. Новым пользователям код ставит 0 (тихо);
+  // значение «по умолчанию 1» осталось в базе с первой версии, менять его база сама не умеет.
+  notify:   integer('notify').notNull().default(1),
+  favOnly:  integer('fav_only').notNull().default(0), // 1 — уведомлять только об избранных собеседниках
+  vip:      integer('vip').notNull().default(0),      // 1 — бессрочный VIP (выдаёт владелец)
+  trial:    integer('trial').notNull().default(0),    // 1 — пробный Pro уже выдан
+  tz:       integer('tz').notNull().default(300),     // часовой пояс в минутах (Ташкент = 300), нужен для сводки
+  refBy:    integer('ref_by'),                        // кто пригласил
+  refDone:  integer('ref_done').notNull().default(0), // 1 — пригласивший уже получил награду
+  banned:   integer('banned').notNull().default(0),   // 1 — заблокирован админом
+  role:     text('role').notNull().default(''),       // 'admin' — помощник владельца (без права выдавать VIP)
+  pin:      text('pin'),                              // PIN-код на вход в приложение (хранится в зашифрованном виде)
+  pinFails: integer('pin_fails').notNull().default(0),
+  pinLock:  integer('pin_lock').notNull().default(0), // до какого времени ввод PIN заблокирован
+  vaultId:  integer('vault_id'),                      // канал-«сейф», куда бот копирует удалённые файлы
+  vaultTitle: text('vault_title').notNull().default(''),
+  weekly:   integer('weekly').notNull().default(1),   // 1 — присылать отчёт за неделю
+  reportWeek: integer('report_week').notNull().default(0), // за какую неделю отчёт уже был
+  digestDay: integer('digest_day').notNull().default(0), // сводка: за какой день копим счётчики
+  digestDel: integer('digest_del').notNull().default(0),
+  digestEd:  integer('digest_ed').notNull().default(0),
   created:  integer('created_at').notNull().default(0),
 });
 
@@ -31,17 +54,41 @@ export const messages = table('messages', {
   chatId:    integer('chat_id').notNull(),
   messageId: integer('message_id').notNull(),
   fromName:  text('from_name').notNull(),
+  fromId:    integer('from_id'),                      // Telegram ID отправителя
+  username:  text('username'),                        // его @username, если есть
+  meta:      text('meta'),                            // подробности в формате JSON: размер файла, длительность, пересылка…
   date:      integer('date').notNull(),
   kind:      text('kind').notNull(),                  // 'text' | 'photo' | 'video' | ...
   text:      text('text').notNull().default(''),      // текст или подпись к медиа
   fileId:    text('file_id'),                         // ссылка Telegram на файл, если это медиа
   deletedAt: integer('deleted_at'),                   // когда удалено (пусто — не удалено)
   editedAt:  integer('edited_at'),                    // когда последний раз изменено
+  kept:      integer('kept').notNull().default(0),    // 1 — закладка: не стирать по сроку хранения
 }, (t) => ({
   oneMessage: uniqueIndex('uidx_messages_key').on(t.connId, t.chatId, t.messageId),
   byOwnerDeleted: index('idx_messages_owner_deleted').on(t.ownerId, t.deletedAt),
   byOwnerEdited: index('idx_messages_owner_edited').on(t.ownerId, t.editedAt),
   byDate: index('idx_messages_date').on(t.date),
+}));
+
+// Чаты пользователя: по одной строке на собеседника. Счётчики копятся за всё время,
+// даже когда сами сообщения уже стёрты по сроку хранения.
+export const chats = table('chats', {
+  id:       integer('id').primaryKey({ autoIncrement: true }),
+  ownerId:  integer('owner_id').notNull(),
+  chatId:   integer('chat_id').notNull(),             // Telegram ID собеседника
+  name:     text('name').notNull().default(''),
+  username: text('username').notNull().default(''),
+  saved:    integer('saved').notNull().default(0),    // сколько сообщений собеседника увидел бот
+  deleted:  integer('deleted').notNull().default(0),  // сколько из них удалено
+  edited:   integer('edited').notNull().default(0),   // сколько правок
+  muted:    integer('muted').notNull().default(0),    // 1 — не присылать уведомления по этому чату
+  fav:      integer('fav').notNull().default(0),      // 1 — избранный собеседник
+  firstAt:  integer('first_at').notNull().default(0),
+  lastAt:   integer('last_at').notNull().default(0),  // последнее сообщение
+  eventAt:  integer('event_at').notNull().default(0), // последнее удаление или правка
+}, (t) => ({
+  oneChat: uniqueIndex('uidx_chats_key').on(t.ownerId, t.chatId),
 }));
 
 // История правок: что было в сообщении до изменения.
@@ -50,11 +97,38 @@ export const edits = table('edits', {
   msgId:   integer('msg_id').notNull(),               // messages.id
   ownerId: integer('owner_id').notNull(),
   oldText: text('old_text').notNull().default(''),
+  oldKind: text('old_kind'),                          // каким было сообщение: 'text' | 'photo' | ...
+  oldFileId: text('old_file_id'),                     // прежний файл, если при правке его заменили
   at:      integer('at').notNull(),
 }, (t) => ({
   byMsg: index('idx_edits_msg').on(t.msgId),
   byOwner: index('idx_edits_owner').on(t.ownerId),
 }));
+
+// Промокоды: человек вводит код и получает дни Pro.
+export const promos = table('promos', {
+  code:    text('code').primaryKey(),
+  days:    integer('days').notNull(),
+  maxUses: integer('max_uses').notNull(),
+  used:    integer('used').notNull().default(0),
+  created: integer('created_at').notNull().default(0),
+});
+
+// Кто какой промокод уже использовал (один код — один раз на человека).
+export const promoUses = table('promo_uses', {
+  id:     integer('id').primaryKey({ autoIncrement: true }),
+  code:   text('code').notNull(),
+  userId: integer('user_id').notNull(),
+  at:     integer('at').notNull(),
+}, (t) => ({
+  once: uniqueIndex('uidx_promo_uses').on(t.code, t.userId),
+}));
+
+// Настройки, которые владелец меняет из админ-панели (цена, сроки, лимиты). Ключ → число.
+export const settings = table('settings', {
+  key:   text('key').primaryKey(),
+  value: integer('value').notNull(),
+});
 
 // Оплаты звёздами.
 export const payments = table('payments', {

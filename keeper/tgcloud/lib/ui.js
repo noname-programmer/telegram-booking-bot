@@ -1,11 +1,12 @@
 // lib/ui.js — тексты, кнопки и отправка уведомлений.
 // Формат callback_data (данные кнопки, до 64 байт):
-//   menu | pro | lang | lang:<код> | privacy | wipe:ask | wipe:yes | wipe:no
+//   pro | lang | lang:<код> | notify | privacy | wipe:ask | wipe:yes | wipe:no
+// Кнопка notify переключает режим уведомлений по кругу: тихо → коротко → сводка → полностью.
 
 import { api, BotApiError } from 'sdk';
-import { BOT_NAME, MINIAPP_URL, PRO, LIMITS } from './config.js';
+import { BOT_NAME, MINIAPP_URL, PRO, LIMITS, NOTIFY, OWNER_ID } from './config.js';
 import { t, LANGS } from './i18n.js';
-import { isPro, hasActiveConnection } from './store.js';
+import { isPro, hasActiveConnection, digestTick, weeklyTick, clearVault } from './store.js';
 
 // Экранирует текст пользователя, чтобы он не сломал HTML-разметку.
 export const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -35,14 +36,32 @@ export async function menu(user, username) {
     t(lang, 'start', { bot: BOT_NAME, username }),
     '',
     t(lang, (await hasActiveConnection(user.id)) ? 'statusOn' : 'statusOff'),
-    isPro(user) ? t(lang, 'planPro', { date: fmtDate(user.proUntil) }) : t(lang, 'planFree', { days: LIMITS.freeDays }),
+    planLine(user),
+    t(lang, `notify${user.notify}`),
   ];
   const rows = [];
   if (MINIAPP_URL) rows.push([{ text: t(lang, 'btnHistory'), web_app: { url: MINIAPP_URL } }]);
   rows.push([{ text: t(lang, 'btnPro'), callback_data: 'pro' }, { text: t(lang, 'btnLang'), callback_data: 'lang' }]);
+  rows.push([{ text: t(lang, `btnNotify${user.notify}`), callback_data: 'notify' }]);
   rows.push([{ text: t(lang, 'btnPrivacy'), callback_data: 'privacy' }]);
   return { text: lines.join('\n'), reply_markup: { inline_keyboard: rows } };
 }
+
+// Строка о тарифе: владелец, VIP, Pro до даты или бесплатный.
+export function planLine(user) {
+  const lang = user.lang;
+  if (user.id === OWNER_ID) return t(lang, 'planOwner');
+  if (user.vip) return t(lang, 'planVip');
+  return isPro(user) ? t(lang, 'planPro', { date: fmtDate(user.proUntil) }) : t(lang, 'planFree', { days: LIMITS.freeDays });
+}
+
+// Следующий режим уведомлений при нажатии кнопки в меню.
+export const nextNotify = (mode) => ({ [NOTIFY.off]: NOTIFY.short, [NOTIFY.short]: NOTIFY.digest, [NOTIFY.digest]: NOTIFY.full })[mode] ?? NOTIFY.off;
+
+// Кнопка «Открыть» под сообщением: запускает мини-приложение.
+const openButton = (lang) => (MINIAPP_URL
+  ? { reply_markup: { inline_keyboard: [[{ text: t(lang, 'btnOpen'), web_app: { url: MINIAPP_URL } }]] } }
+  : {});
 
 export function langKeyboard() {
   return { inline_keyboard: [Object.entries(LANGS).map(([code, name]) => ({ text: name, callback_data: `lang:${code}` }))] };
@@ -65,13 +84,10 @@ export function wipeConfirm(lang) {
   };
 }
 
-// Экран подписки: описание и кнопка оплаты звёздами.
-export async function proScreen(user) {
-  const lang = user.lang;
+// Ссылка на оплату подписки звёздами (её же открывает мини-приложение).
+export function invoiceLink(lang) {
   const vars = { stars: PRO.stars, freeDays: LIMITS.freeDays, proDays: LIMITS.proDays };
-  const about = t(lang, 'proAbout', vars);
-  if (isPro(user)) return { text: `${about}\n\n${t(lang, 'planPro', { date: fmtDate(user.proUntil) })}` };
-  const url = await api.createInvoiceLink({
+  return api.createInvoiceLink({
     title: t(lang, 'proTitle'),
     description: t(lang, 'proDesc', vars),
     payload: 'pro',
@@ -80,6 +96,15 @@ export async function proScreen(user) {
     prices: [{ label: t(lang, 'proTitle'), amount: PRO.stars }],
     subscription_period: PRO.periodSeconds,
   });
+}
+
+// Экран подписки: описание и кнопка оплаты звёздами.
+export async function proScreen(user) {
+  const lang = user.lang;
+  const vars = { stars: PRO.stars, freeDays: LIMITS.freeDays, proDays: LIMITS.proDays };
+  const about = t(lang, 'proAbout', vars);
+  if (isPro(user)) return { text: `${about}\n\n${planLine(user)}` };
+  const url = await invoiceLink(lang);
   return { text: about, reply_markup: { inline_keyboard: [[{ text: t(lang, 'btnPay', vars), url }]] } };
 }
 
@@ -101,6 +126,40 @@ export async function sendMedia(chatId, row) {
     if (e instanceof BotApiError) return false;
     throw e;
   }
+}
+
+// Копирует файл удалённого сообщения в канал-«сейф» пользователя (если он его подключил и у него Pro или VIP).
+// Файл не скачивается: бот отправляет в канал ту же ссылку Telegram, поэтому это быстро при любом размере.
+const NO_CAPTION = ['sticker', 'video_note'];
+export async function vaultCopy(user, row, fileId = row.fileId, kind = row.kind) {
+  const method = SEND[kind];
+  if (!user.vaultId || !fileId || !method || !isPro(user)) return false;
+  const when = new Date((row.date + user.tz * 60) * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  const caption = `🗑 ${row.fromName} · ${when}${row.text ? `\n${row.text}` : ''}`.slice(0, 1000);
+  try {
+    await api[method]({ chat_id: user.vaultId, [kind]: fileId, ...(NO_CAPTION.includes(kind) ? {} : { caption }) });
+    return true;
+  } catch (e) {
+    if (!(e instanceof BotApiError)) throw e;
+    // Бота убрали из канала или канал удалён — отвязываем «сейф», чтобы не стучаться туда каждый раз.
+    if (e.code === 403 || /chat not found/i.test(e.description ?? '')) {
+      await clearVault(user.vaultId);
+      user.vaultId = null;
+    }
+    return false;
+  }
+}
+
+// Раз в неделю (при первом сообщении новой недели) присылает короткий отчёт за прошлую. Только Pro и VIP.
+export async function weeklyReport(user, chatId) {
+  if (!user.weekly || !isPro(user)) return;
+  const data = await weeklyTick(user);
+  if (!data) return;
+  const lang = user.lang;
+  const lines = [t(lang, 'weekTitle'), '', t(lang, 'weekTotals', data)];
+  if (data.top.length) lines.push('', t(lang, 'weekTop'), ...data.top.map(([name, n], i) => `${['🥇', '🥈', '🥉'][i]} ${esc(name)} — ${n}`));
+  if (data.hour !== null) lines.push('', t(lang, 'weekHour', { from: String(data.hour).padStart(2, '0'), to: String((data.hour + 1) % 24).padStart(2, '0') }));
+  await send(chatId, lines.join('\n'), openButton(lang));
 }
 
 // Текст о сообщении: вид (если это не просто текст) и содержимое.
@@ -129,4 +188,36 @@ export async function notifyEdited(user, chatId, before, after) {
     `<b>${t(lang, 'was')}</b>`, body(lang, before, half) || '—',
     `<b>${t(lang, 'now')}</b>`, body(lang, { ...before, ...after }, half) || '—',
   ].join('\n'));
+}
+
+// Решает, писать ли владельцу аккаунта в чат с ботом, и в каком виде. Запись в мини-приложении появляется всегда.
+//   peer  — строка собеседника из таблицы chats (в ней «без звука» и «избранный»)
+//   event — { type: 'deleted', rows } или { type: 'edited', before, after }
+export async function announce(user, chatId, peer, event) {
+  const lang = user.lang;
+  const mode = user.notify;
+  if (!mode || peer?.muted || (user.favOnly && !peer?.fav)) return;
+  const deleted = event.type === 'deleted';
+  const n = deleted ? event.rows.length : 1;
+  const name = esc(deleted ? event.rows[0].fromName : event.before.fromName);
+
+  if (mode === NOTIFY.digest) {
+    // Одно сообщение в день: при первом событии дня. Остальное молча копится.
+    const prev = await digestTick(user, event.type, n);
+    if (!prev) return;
+    const lines = [t(lang, deleted ? 'digestDeleted' : 'digestEdited', { name }), t(lang, 'digestRest')];
+    if (prev.deleted + prev.edited > 0) lines.push('', t(lang, 'digestPrev', prev));
+    await send(chatId, lines.join('\n'), openButton(lang));
+    return;
+  }
+  if (mode === NOTIFY.short) {
+    const key = deleted ? (n > 1 ? 'shortDeletedMany' : 'shortDeleted') : 'shortEdited';
+    await send(chatId, t(lang, key, { name, n }), openButton(lang));
+    return;
+  }
+  if (!deleted) return notifyEdited(user, chatId, event.before, event.after);
+  // Удалили весь чат или много сообщений сразу — не засыпаем пользователя уведомлениями.
+  const shown = event.rows.slice(0, LIMITS.notifyPerDelete);
+  if (n > shown.length) await send(chatId, t(lang, 'deletedMany', { name, n, shown: shown.length }));
+  for (const row of shown) await notifyDeleted(user, chatId, row);
 }
