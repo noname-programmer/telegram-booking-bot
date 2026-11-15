@@ -1,0 +1,92 @@
+{
+  "": {
+    "description": "Keeper shows you messages that the other person deleted or edited in your private chats.\n\n• Deleted texts, photos, videos, voice messages and files — in original quality\n• Edit history: what it said before and after\n• Everything is sorted by person in a handy app, with no flood of notifications\n• PIN code, a safe for files, insights\n\nSet up in a minute: Telegram Settings → Telegram Business → Chatbots. Tap Start.",
+    "short": "Shows deleted and edited messages from your private chats. Photos, videos and files in original quality.",
+    "commands": [
+      [
+        "start",
+        "Main menu and how to connect"
+      ],
+      [
+        "pro",
+        "Pro: files, full history, 30 days of storage"
+      ],
+      [
+        "promo",
+        "Enter a promo code: /promo CODE"
+      ],
+      [
+        "lang",
+        "Language"
+      ],
+      [
+        "privacy",
+        "My data and how to delete it"
+      ],
+      [
+        "resetpin",
+        "Forgot the app PIN"
+      ]
+    ]
+  },
+  "ru": {
+    "description": "Keeper показывает сообщения, которые собеседник удалил или изменил в личном чате с вами.\n\n• Удалённые тексты, фото, видео, голосовые и файлы — в исходном качестве\n• История правок: что было и что стало\n• Всё разложено по людям в удобном приложении, без потока уведомлений\n• PIN-код, сейф для файлов, аналитика\n\nПодключение за минуту: Настройки Telegram → Telegram для бизнеса → Чат-боты. Нажмите «Начать».",
+    "short": "Показывает удалённые и изменённые сообщения из ваших личных чатов. Фото, видео и файлы — в исходном качестве.",
+    "commands": [
+      [
+        "start",
+        "Главное меню и как подключить"
+      ],
+      [
+        "pro",
+        "Pro: файлы, полная история, хранение 30 дней"
+      ],
+      [
+        "promo",
+        "Ввести промокод: /promo КОД"
+      ],
+      [
+        "lang",
+        "Язык"
+      ],
+      [
+        "privacy",
+        "Мои данные и как их удалить"
+      ],
+      [
+        "resetpin",
+        "Забыли PIN-код приложения"
+      ]
+    ]
+  },
+  "uz": {
+    "description": "Keeper suhbatdoshingiz shaxsiy chatda o'chirgan yoki o'zgartirgan xabarlarni ko'rsatadi.\n\n• O'chirilgan matn, rasm, video, ovozli xabar va fayllar — asl sifatida\n• Tahrirlar tarixi: avval nima edi va nima bo'ldi\n• Hammasi qulay ilovada odamlar bo'yicha tartiblangan, bildirishnomalar oqimisiz\n• PIN-kod, fayllar uchun seyf, tahlil\n\nBir daqiqada ulanadi: Telegram sozlamalari → Telegram biznes uchun → Chat-botlar. «Boshlash» ni bosing.",
+    "short": "Shaxsiy chatlaringizdagi o'chirilgan va o'zgartirilgan xabarlarni ko'rsatadi. Rasm, video va fayllar — asl sifatida.",
+    "commands": [
+      [
+        "start",
+        "Asosiy menyu va qanday ulash"
+      ],
+      [
+        "pro",
+        "Pro: fayllar, to'liq tarix, 30 kun saqlash"
+      ],
+      [
+        "promo",
+        "Promokod kiritish: /promo KOD"
+      ],
+      [
+        "lang",
+        "Til"
+      ],
+      [
+        "privacy",
+        "Ma'lumotlarim va ularni o'chirish"
+      ],
+      [
+        "resetpin",
+        "Ilova PIN-kodini unutdingizmi"
+      ]
+    ]
+  }
+}

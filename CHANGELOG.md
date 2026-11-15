@@ -29,6 +29,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Keeper: best quality everywhere. The largest photo size is picked by size, not by position; the Mini App loads files
   up to 20 MB in 1 MB parts and shows them unmodified; "Get as a file" sends photos and videos as uncompressed
   documents (falls back to re-sending by `file_id`).
+- Keeper: bot profile set up — avatar, description, short description and command list in three languages
+  (`keeper/BOTFATHER.md`, `keeper/assets/`).
 - Keeper: pin a message, photo or video to the top of a person's page (`messages.pinned`, survives retention).
   Mini App: the Profile tab is split into Account and Settings, the admin panel opens from Account; screens are
   shown instantly from memory and refreshed in the background, with slide transitions, a sliding tab indicator,
