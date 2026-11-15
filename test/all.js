@@ -11,5 +11,8 @@ for (const cfg of configs) {
   });
   if (r.status !== 0) failed++;
 }
-console.log(failed ? `\n❌ Конфигураций с ошибками: ${failed}` : `\n🎉 Все ${configs.length} конфигурации прошли проверку`);
+// Второй бот в этом репозитории — Keeper (папка keeper/), у него свои сценарии.
+console.log('\n━━━ keeper/ ━━━');
+if (spawnSync(process.execPath, ['--import', './register.js', 'keeper.js'], { stdio: 'inherit' }).status !== 0) failed++;
+console.log(failed ? `\n❌ Конфигураций с ошибками: ${failed}` : `\n🎉 Все ${configs.length} конфигурации и бот Keeper прошли проверку`);
 process.exit(failed ? 1 : 0);

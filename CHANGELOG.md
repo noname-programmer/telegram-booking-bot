@@ -7,6 +7,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `keeper/`: a second, separate bot. It connects through Telegram Business and shows the user messages
+  that the other person deleted or edited; Mini App with history, Pro subscription paid in Telegram Stars,
+  Russian / Uzbek / English. Scenarios in `test/keeper.js`.
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).
