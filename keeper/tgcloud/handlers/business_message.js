@@ -3,7 +3,7 @@
 
 import { ownerOf } from '../lib/business.js';
 import { saveMessage, touchChat, cleanup } from '../lib/store.js';
-import { weeklyReport } from '../lib/ui.js';
+import { weeklyReport, proReminder } from '../lib/ui.js';
 
 export default async function onBusinessMessage(message) {
   const found = await ownerOf(message.business_connection_id);
@@ -18,4 +18,6 @@ export default async function onBusinessMessage(message) {
   if (message.message_id % 50 === 0) await cleanup();
   // И по той же причине отчёт за неделю уходит при первом сообщении новой недели.
   await weeklyReport(user, conn.userChatId);
+  // Заодно напоминаем, если Pro заканчивается завтра.
+  await proReminder(user, conn.userChatId);
 }

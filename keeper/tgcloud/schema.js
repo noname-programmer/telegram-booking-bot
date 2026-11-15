@@ -27,6 +27,8 @@ export const users = table('users', {
   pinLock:  integer('pin_lock').notNull().default(0), // до какого времени ввод PIN заблокирован
   vaultId:  integer('vault_id'),                      // канал-«сейф», куда бот копирует удалённые файлы
   vaultTitle: text('vault_title').notNull().default(''),
+  alertClear: integer('alert_clear').notNull().default(1), // 1 — предупреждать, когда разом удалили много сообщений
+  remindedFor: integer('reminded_for').notNull().default(0), // о каком сроке окончания Pro уже напомнили
   weekly:   integer('weekly').notNull().default(1),   // 1 — присылать отчёт за неделю
   reportWeek: integer('report_week').notNull().default(0), // за какую неделю отчёт уже был
   digestDay: integer('digest_day').notNull().default(0), // сводка: за какой день копим счётчики
@@ -87,8 +89,21 @@ export const chats = table('chats', {
   firstAt:  integer('first_at').notNull().default(0),
   lastAt:   integer('last_at').notNull().default(0),  // последнее сообщение
   eventAt:  integer('event_at').notNull().default(0), // последнее удаление или правка
+  renamedAt: integer('renamed_at').notNull().default(0), // когда собеседник последний раз сменил имя или @username
 }, (t) => ({
   oneChat: uniqueIndex('uidx_chats_key').on(t.ownerId, t.chatId),
+}));
+
+// Прежние имена собеседников: строка появляется, когда человек сменил имя или @username.
+export const names = table('names', {
+  id:       integer('id').primaryKey({ autoIncrement: true }),
+  ownerId:  integer('owner_id').notNull(),
+  chatId:   integer('chat_id').notNull(),
+  name:     text('name').notNull().default(''),      // каким имя было раньше
+  username: text('username').notNull().default(''),
+  at:       integer('at').notNull(),                  // когда заметили смену
+}, (t) => ({
+  byChat: index('idx_names_chat').on(t.ownerId, t.chatId),
 }));
 
 // История правок: что было в сообщении до изменения.

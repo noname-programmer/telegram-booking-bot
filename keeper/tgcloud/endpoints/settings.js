@@ -6,6 +6,7 @@
 //   { fav: { chatId, fav } }          — добавить собеседника в избранные
 //   { keep: { id, on } }              — поставить или снять закладку (сообщение не сотрётся по сроку хранения)
 //   { weekly: true|false }            — присылать ли отчёт за неделю
+//   { alertClear: true|false }        — предупреждать ли, когда разом удалили много сообщений
 //   { wipe: true }                    — удалить все сохранённые сообщения
 
 import { EndpointError } from 'sdk';
@@ -22,6 +23,7 @@ export default async function (input, ctx) {
   if (Object.values(NOTIFY).includes(input.notify)) patch.notify = input.notify;
   if (typeof input.favOnly === 'boolean') patch.favOnly = input.favOnly ? 1 : 0;
   if (typeof input.weekly === 'boolean') patch.weekly = input.weekly ? 1 : 0;
+  if (typeof input.alertClear === 'boolean') patch.alertClear = input.alertClear ? 1 : 0;
   if (typeof input.lang === 'string' && LANGS[input.lang]) patch.lang = input.lang;
   await setPrefs(user.id, patch);
   if (chatOf(input.mute) !== null) await setMuted(user.id, chatOf(input.mute), Boolean(input.mute.muted));

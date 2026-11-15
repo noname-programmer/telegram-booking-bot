@@ -3,7 +3,7 @@
 
 import { db } from 'sdk';
 import { eq, and, or, gt, asc, desc, inArray, isNotNull, sql } from 'sdk/db';
-import { users, connections, chats, messages, edits, payments, promos, promoUses, settings } from '../schema.js';
+import { users, connections, chats, names, messages, edits, payments, promos, promoUses, settings } from '../schema.js';
 import { LIMITS, PRO, REF, OWNER_ID, ADMIN_IDS } from './config.js';
 import { pickLang } from './i18n.js';
 
@@ -17,6 +17,7 @@ const DAY = 24 * 60 * 60;
 // ключ → [где лежит, имя, минимум, максимум]
 const TUNABLE = {
   stars: [PRO, 'stars', 1, 10000],          // цена Pro в звёздах
+  yearStars: [PRO, 'yearStars', 1, 100000], // цена года
   trialDays: [PRO, 'trialDays', 0, 30],     // пробный срок
   refDays: [REF, 'days', 0, 365],           // награда за приглашение
   freeDays: [LIMITS, 'freeDays', 1, 30],    // хранение без Pro
@@ -65,7 +66,7 @@ export async function getUser(tgUser) {
     found = {
       id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0, name, username,
       notify: 0, favOnly: 0, vip: 0, trial: 0, tz: 300, refBy: null, refDone: 0,
-      digestDay: 0, digestDel: 0, digestEd: 0, banned: 0, role: '', pin: null, pinFails: 0, pinLock: 0,
+      alertClear: 1, remindedFor: 0, digestDay: 0, digestDel: 0, digestEd: 0, banned: 0, role: '', pin: null, pinFails: 0, pinLock: 0,
       vaultId: null, vaultTitle: '', weekly: 1, reportWeek: 0, created: now(),
     };
     await db.insert(users).values(found).onConflictDoNothing({ target: users.id }).run();
@@ -294,6 +295,44 @@ export async function digestTick(user, field, n = 1) {
   return fresh ? prev : null;
 }
 
+// Записывает разовую оплату (год или подарок). false — если уведомление об этом платеже уже приходило.
+export async function recordPayment(chargeId, userId, stars) {
+  if (await db.select().from(payments).where(eq(payments.chargeId, chargeId)).get()) return false;
+  await db.insert(payments).values({ chargeId, userId, stars, at: now() }).run();
+  return true;
+}
+
+// Ищет пользователя по ID или @username (для подарка). Только среди тех, кто уже запускал бота.
+export async function findUser(text) {
+  const raw = String(text ?? '').trim().replace(/^@/, '');
+  if (!raw) return null;
+  if (/^\d+$/.test(raw)) return (await db.select().from(users).where(eq(users.id, Number(raw))).get()) ?? null;
+  const all = await db.select().from(users).where(sql`lower(username) = ${raw.toLowerCase()}`).all();
+  return all[0] ?? null;
+}
+
+// Пора ли напомнить, что Pro заканчивается: остались сутки или меньше, об этом сроке ещё не напоминали,
+// и человек не платил недавно (у оплаченной подписки Telegram продлит её сам). true — один раз на каждый срок.
+export async function proEndsSoon(user) {
+  const t = now();
+  if (user.vip || user.proUntil <= t || user.proUntil - t > DAY || user.remindedFor === user.proUntil) return false;
+  await setPrefs(user.id, { remindedFor: user.proUntil });
+  user.remindedFor = user.proUntil;
+  const paid = await db.select().from(payments).where(and(eq(payments.userId, user.id), gt(payments.at, t - 35 * DAY))).get();
+  return !paid;
+}
+
+// Рейтинг пригласивших: кто привёл больше друзей, которые подключили бота.
+export async function refTop(limit = 10) {
+  const rows = await db.all(sql`select ref_by as id, count(*) as n from users where ref_done = 1 and ref_by is not null group by ref_by order by n desc, ref_by asc limit ${limit}`);
+  const out = [];
+  for (const r of rows) {
+    const u = await db.select().from(users).where(eq(users.id, r.id)).get();
+    if (u) out.push({ id: u.id, name: u.name, n: Number(r.n) });
+  }
+  return out;
+}
+
 // Записывает оплату и включает Pro. Повторное уведомление о том же платеже ничего не меняет.
 export async function grantPro(userId, until, chargeId, stars) {
   const seen = await db.select().from(payments).where(eq(payments.chargeId, chargeId)).get();
@@ -420,9 +459,14 @@ export async function touchChat(ownerId, chat, date) {
   const at = date ?? now();
   const name = displayName(chat);
   const username = chat.username ?? '';
-  if (!(await getChat(ownerId, chat.id))) {
+  const known = await getChat(ownerId, chat.id);
+  if (!known) {
     await db.insert(chats).values({ ownerId, chatId: chat.id, name, username, firstAt: at, lastAt: at })
       .onConflictDoNothing().run();
+  } else if (known.name && (known.name !== name || known.username !== username)) {
+    // Собеседник сменил имя или @username — запоминаем, каким оно было.
+    await db.insert(names).values({ ownerId, chatId: chat.id, name: known.name, username: known.username, at: now() }).run();
+    await db.update(chats).set({ renamedAt: now() }).where(eq(chats.id, known.id)).run();
   }
   await db.run(sql`update chats set saved = saved + 1, name = ${name}, username = ${username}, last_at = ${at}
     where owner_id = ${ownerId} and chat_id = ${chat.id}`);
@@ -436,6 +480,11 @@ export async function countEvent(ownerId, chatId, field, n = 1) {
   } else {
     await db.run(sql`update chats set edited = edited + ${n}, event_at = ${at} where owner_id = ${ownerId} and chat_id = ${chatId}`);
   }
+}
+
+// Прежние имена собеседника, от недавних к старым.
+export async function chatNames(ownerId, chatId) {
+  return db.select().from(names).where(and(eq(names.ownerId, ownerId), eq(names.chatId, chatId))).orderBy(desc(names.id)).limit(20).all();
 }
 
 export async function setFav(ownerId, chatId, fav) {
@@ -530,9 +579,10 @@ export async function feed(ownerId, { type = 'all', chatId = null, q = '', limit
 }
 
 // Все сохранённые сообщения одного собеседника по порядку — для выгрузки в файл.
+// chatId = null — сообщения всех собеседников (полная выгрузка).
 export async function chatHistory(ownerId, chatId, limit) {
   const rows = await db.select().from(messages)
-    .where(and(eq(messages.ownerId, ownerId), eq(messages.chatId, chatId)))
+    .where(chatId === null ? eq(messages.ownerId, ownerId) : and(eq(messages.ownerId, ownerId), eq(messages.chatId, chatId)))
     .orderBy(desc(messages.date)).limit(limit).all();
   rows.reverse();
   const changed = rows.filter((r) => r.editedAt).map((r) => r.id);
@@ -564,6 +614,7 @@ export async function wipeUser(ownerId) {
   await db.delete(edits).where(eq(edits.ownerId, ownerId)).run();
   await db.delete(messages).where(eq(messages.ownerId, ownerId)).run();
   await db.delete(chats).where(eq(chats.ownerId, ownerId)).run();
+  await db.delete(names).where(eq(names.ownerId, ownerId)).run();
 }
 
 // Стирает устаревшие записи: у бесплатных — старше freeDays, у всех — старше proDays.

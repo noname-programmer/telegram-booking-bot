@@ -27,6 +27,7 @@ import invoiceEndpoint from '../keeper/tgcloud/endpoints/invoice.js';
 import exportEndpoint from '../keeper/tgcloud/endpoints/export.js';
 import pinEndpoint from '../keeper/tgcloud/endpoints/pin.js';
 import promoEndpoint from '../keeper/tgcloud/endpoints/promo.js';
+import topEndpoint from '../keeper/tgcloud/endpoints/top.js';
 import onMyChatMember from '../keeper/tgcloud/handlers/my_chat_member.js';
 import { base64, utf8 } from '../keeper/tgcloud/lib/app.js';
 
@@ -658,6 +659,149 @@ await step('Отчёт за неделю: одно сообщение при п�
   sqlite.prepare("delete from messages where text like 'нед %' or text = 'w'").run();
   givePro(OWNER, 0);
   setMode(OWNER, NOTIFY.full);
+});
+
+await step('История имён: собеседник сменил имя или @username → прежнее сохраняется', async () => {
+  const say = (first_name, username) => {
+    const m = biz({ text: 'имя' });
+    m.chat = { id: FRIEND, type: 'private', first_name, username };
+    return onBizMessage(m);
+  };
+  await say('Friend');                                                                               // то же имя — ничего не пишем
+  assert.equal((await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OWNER))).names.length, 0);
+  await say('Алексей', 'alex');
+  await say('Алексей', 'alex');
+  await say('Алекс Новый', 'alex');
+  const data = await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OWNER));
+  assert.deepEqual(data.names.map((n) => [n.name, n.username]), [['Алексей', 'alex'], ['Friend', '']]); // от недавних к старым
+  const chat = (await chatsEndpoint({}, ctx(OWNER))).chats[0];
+  assert.equal(chat.name, 'Алекс Новый');
+  assert.ok(chat.renamedAt > 0);
+  assert.equal((await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OTHER))).names.length, 0);     // чужие имена не видны
+  await say('Friend');
+  sqlite.prepare('delete from names').run();
+  sqlite.prepare("delete from messages where text = 'имя'").run();
+});
+
+await step('Тревога «чат очищен»: приходит и в тихом режиме, выключается в профиле', async () => {
+  const wipeChat = async (n) => {
+    const ids = [];
+    for (let i = 0; i < n; i++) { const m = biz({ text: `чистка ${i}` }); ids.push(m.message_id); await onBizMessage(m); }
+    await del(ids);
+    const out = sent(take());
+    sqlite.prepare("delete from messages where text like 'чистка%'").run();
+    return out;
+  };
+  setMode(OWNER, NOTIFY.off);
+  assert.equal((await wipeChat(LIMITS.clearAlert - 1)).length, 0);                                    // чуть меньше порога — тихо
+  const out = await wipeChat(LIMITS.clearAlert);
+  assert.equal(out.length, 1);
+  assert.match(out[0].params.text, new RegExp(`🚨.+Friend.+${LIMITS.clearAlert}`));
+  setMode(OWNER, NOTIFY.short);
+  assert.equal((await wipeChat(LIMITS.clearAlert)).length, 1);                                        // в коротком режиме — без повтора
+  setMode(OWNER, NOTIFY.full);
+  assert.equal((await wipeChat(LIMITS.clearAlert)).length, 1 + 1 + LIMITS.notifyPerDelete);           // в полном — тревога, итог и первые сообщения
+  setMode(OWNER, NOTIFY.off);
+  await settingsEndpoint({ alertClear: false }, ctx(OWNER));
+  assert.equal((await wipeChat(LIMITS.clearAlert)).length, 0);
+  await settingsEndpoint({ alertClear: true }, ctx(OWNER));
+  setMode(OWNER, NOTIFY.full);
+});
+
+await step('Напоминание: Pro заканчивается завтра — один раз; у платящих подписчиков и VIP его нет', async () => {
+  const USER = 40;
+  setMode(USER, NOTIFY.off);
+  const until = now() + 20 * 3600;
+  const ping = async () => { await msg(USER, { text: '/start' }); return texts(take()); };
+  givePro(USER, now() + 5 * 86400);
+  assert.doesNotMatch(await ping(), /заканчивается/);                                                 // ещё далеко
+  givePro(USER, until);
+  assert.match(await ping(), /Pro заканчивается/);
+  assert.doesNotMatch(await ping(), /заканчивается/);                                                 // второй раз не напоминаем
+  givePro(USER, until + 60);                                                                         // срок изменился — можно напомнить снова
+  sqlite.prepare("insert into payments (charge_id, user_id, stars, at) values ('sub-40', ?, 150, ?)").run(USER, now() - 86400);
+  assert.doesNotMatch(await ping(), /заканчивается/);                                                 // платил недавно — Telegram продлит сам
+  sqlite.prepare("delete from payments where charge_id = 'sub-40'").run();
+  givePro(OWNER_ID, until);
+  await msg(OWNER_ID, { text: '/start' });
+  assert.doesNotMatch(texts(take()), /заканчивается/);                                                // у VIP напоминаний нет
+  givePro(USER, 0);
+});
+
+await step('Год со скидкой: разовая оплата прибавляет 365 дней', async () => {
+  givePro(OTHER, 0);
+  const res = await invoiceEndpoint({ plan: 'year' }, ctx(OTHER));
+  assert.equal(res.pro, false);
+  const link = sent(take(), 'createInvoiceLink')[0].params;
+  assert.deepEqual([link.payload, link.prices[0].amount, link.subscription_period], ['year', PRO.yearStars, undefined]);
+  assert.ok(PRO.yearStars < PRO.stars * 12);                                                         // это действительно скидка
+  await onPreCheckout({ id: 'y1', from: tgUser(OTHER), currency: 'XTR', total_amount: PRO.yearStars, invoice_payload: 'year' });
+  assert.equal(sent(take(), 'answerPreCheckoutQuery')[0].params.ok, true);
+  const pay = { successful_payment: { currency: 'XTR', total_amount: PRO.yearStars, invoice_payload: 'year', telegram_payment_charge_id: 'year-1' } };
+  await msg(OTHER, pay, 'uz');
+  await msg(OTHER, pay, 'uz');                                                                       // повтор уведомления не считается
+  take();
+  assert.ok(Math.abs(userRow(OTHER).pro_until - (now() + PRO.yearDays * 86400)) < 5);
+  assert.equal(sqlite.prepare("select count(*) as n from payments where charge_id = 'year-1'").get().n, 1);
+  await msg(OWNER, { text: '/pro' });
+  assert.equal(sent(take(), 'createInvoiceLink').length, 2);                                          // в боте две кнопки: месяц и год
+  sqlite.prepare("delete from payments where charge_id = 'year-1'").run();
+  givePro(OTHER, 0);
+});
+
+await step('Подарить Pro другу: платит один, Pro получает другой', async () => {
+  givePro(OTHER, 0);
+  await assert.rejects(() => invoiceEndpoint({ plan: 'gift', to: '424242' }, ctx(OWNER)), /Не нашёл/);
+  await assert.rejects(() => invoiceEndpoint({ plan: 'gift', to: String(OWNER) }, ctx(OWNER)), /Себе/);
+  await assert.rejects(() => invoiceEndpoint({ plan: 'gift', to: '777002' }, ctx(OWNER)));            // не запускал бота
+  sqlite.prepare("update users set username = 'Other_Nick' where id = ?").run(OTHER);
+  const res = await invoiceEndpoint({ plan: 'gift', to: '@other_nick' }, ctx(OWNER));                 // по @username, регистр не важен
+  assert.equal(res.to.id, OTHER);
+  assert.equal(sent(take(), 'createInvoiceLink')[0].params.payload, `gift:${OTHER}`);
+  await onPreCheckout({ id: 'g1', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars, invoice_payload: `gift:${OTHER}` });
+  await onPreCheckout({ id: 'g2', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars, invoice_payload: 'gift:abc' });
+  assert.deepEqual(sent(take(), 'answerPreCheckoutQuery').map((c) => c.params.ok), [true, false]);
+  const before = userRow(OWNER).pro_until;
+  const pay = { successful_payment: { currency: 'XTR', total_amount: PRO.stars, invoice_payload: `gift:${OTHER}`, telegram_payment_charge_id: 'gift-1' } };
+  await msg(OWNER, pay);
+  await msg(OWNER, pay);
+  const out = sent(take());
+  assert.equal(out.length, 2);                                                                       // одно другу, одно дарителю
+  assert.ok(out.some((c) => c.params.chat_id === OTHER && /Pro/.test(c.params.text)));
+  assert.ok(out.some((c) => c.params.chat_id === OWNER && /Подарок отправлен/.test(c.params.text)));
+  assert.ok(Math.abs(userRow(OTHER).pro_until - (now() + PRO.giftDays * 86400)) < 5);
+  assert.equal(userRow(OWNER).pro_until, before);                                                     // дарителю Pro не прибавился
+  sqlite.prepare("delete from payments where charge_id = 'gift-1'").run();
+  sqlite.prepare("update users set username = '' where id = ?").run(OTHER);
+  givePro(OTHER, 0);
+});
+
+await step('Рейтинг приглашений: чужие имена сокращены; призы вручает только владелец', async () => {
+  const data = await topEndpoint({}, ctx(OWNER));
+  assert.deepEqual(data.top.map((r) => [r.place, r.name, r.n, r.me]), [[1, 'Use…', 1, false]]);       // OTHER привёл одного друга
+  assert.equal((await topEndpoint({}, ctx(OTHER))).top[0].name, `User${OTHER}`);                      // себя видно полностью
+  assert.deepEqual(data.prizes, REF.prizes);
+  await assert.rejects(() => adminEndpoint({ action: 'refPrize' }, ctx(OWNER)));
+  givePro(OTHER, 0);
+  await adminEndpoint({ action: 'refPrize' }, ctx(OWNER_ID));
+  assert.ok(sent(take()).some((c) => c.params.chat_id === OTHER && /1-/.test(c.params.text)));
+  assert.ok(Math.abs(userRow(OTHER).pro_until - (now() + REF.prizes[0] * 86400)) < 5);
+  givePro(OTHER, 0);
+});
+
+await step('Полная выгрузка: все собеседники одним файлом', async () => {
+  givePro(OWNER);
+  sqlite.prepare("insert into messages (conn_id, owner_id, chat_id, message_id, from_name, date, kind, text) values ('c', ?, 555, 1, 'Второй', ?, 'text', 'из другого чата')").run(OWNER, now());
+  const res = await exportEndpoint({ all: true }, ctx(OWNER));
+  const doc = sent(take(), 'sendDocument')[0].params;
+  const text = Buffer.from(doc.document.bytes).toString();
+  assert.equal(doc.document.name, 'keeper-all.txt');
+  assert.match(text, /Keeper · Friend · ID 20/);
+  assert.match(text, /Keeper · Второй · ID 555\n\n\[.+\] Второй: из другого чата/);
+  assert.ok(res.count >= 3);
+  givePro(OWNER, 0);
+  await assert.rejects(() => exportEndpoint({ all: true }, ctx(OWNER)));                              // без Pro нельзя
+  sqlite.prepare('delete from messages where chat_id = 555').run();
 });
 
 await step('Чужую историю в мини-приложении не видно', async () => {

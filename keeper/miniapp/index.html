@@ -319,6 +319,18 @@
   .setrow input { width: 86px; flex: none; text-align: center; padding: 9px 6px; }
   .promo-form { display: grid; grid-template-columns: 1fr 74px 74px; gap: 8px; }
   .pill.black { color: #fff; background: #3a3f4b; }
+  .viewer .nav-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; flex: none; }
+  .viewer .nav-btn:disabled { opacity: .3; }
+  .viewer .count { font-size: 12.5px; opacity: .8; flex: none; font-variant-numeric: tabular-nums; }
+  .oldname { display: flex; justify-content: space-between; gap: 10px; padding: 9px 16px; position: relative; font-size: 14px; }
+  .oldname + .oldname::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 1px; background: var(--line); }
+  .oldname span { color: var(--hint); flex: none; font-size: 12.5px; }
+  .plan .btn.alt { background: rgba(255, 255, 255, .22); color: #fff; margin-top: 8px; }
+  .plan .save { font-size: 11px; font-weight: 800; background: #fff; color: #e5484d; border-radius: 999px; padding: 1px 7px; }
+  .toprow { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .toprow .place { width: 30px; flex: none; text-align: center; font-size: 18px; font-weight: 700; color: var(--hint); }
+  .toprow .nm { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toprow.me .nm { color: var(--accent); }
   .toast { position: fixed; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); z-index: 9; max-width: 86%;
            background: rgba(20, 22, 28, .92); color: #fff; padding: 9px 15px; border-radius: 12px; font-size: 13.5px; text-align: center; animation: fade .2s; }
 </style>
@@ -408,7 +420,17 @@ const TEXTS = {
     promoTitle: 'Промокоды', promoCodeLabel: 'Код', promoDays: 'Дней', promoUses: 'Раз', create: 'Создать промокод', promoNone: 'Промокодов пока нет',
     promoUsed: 'использован {u} из {m} · {d} дн. Pro', del: 'Удалить',
     setTitle: 'Цена и лимиты', save: 'Сохранить', setNote: 'Новая цена действует для новых подписок: у тех, кто уже оплатил, она прежняя.', badValues: 'Проверьте значения', saved2: 'Сохранено',
-    setNames: { stars: 'Цена Pro, звёзд в месяц', trialDays: 'Пробный Pro, дней', refDays: 'За приглашение, дней Pro', freeDays: 'Хранение без Pro, дней', proDays: 'Хранение с Pro, дней', freeFeed: 'Записей в истории без Pro', proFeed: 'Записей в истории с Pro' },
+    setNames: { stars: 'Цена Pro, звёзд в месяц', yearStars: 'Цена года, звёзд', trialDays: 'Пробный Pro, дней', refDays: 'За приглашение, дней Pro', freeDays: 'Хранение без Pro, дней', proDays: 'Хранение с Pro, дней', freeFeed: 'Записей в истории без Pro', proFeed: 'Записей в истории с Pro' },
+    namesTitle: 'Прежние имена', namesTill: 'до {d}', renamed: 'сменил(а) имя',
+    alertClear: 'Тревога «чат очищен»', alertClearHint: 'Сообщить, если разом удалили {n} сообщений и больше — даже в тихом режиме',
+    buyYear: 'Год — ⭐️ {stars}', yearSave: '−{p}%', yearHint: 'Разовая оплата на 365 дней, без автопродления',
+    gift: 'Подарить Pro другу', giftHint: '{d} дней Pro за ⭐️ {stars}. Друг должен был запустить бота.', giftPlaceholder: 'ID или @username друга', giftBtn: 'Подарить',
+    giftAsk: 'Подарить Pro на {d} дней пользователю {name}?', giftDone: 'Подарок отправлен 🎁',
+    exportAll: 'Выгрузить все данные', exportAllHint: 'Все чаты одним файлом — придёт в чат с ботом',
+    home: 'Значок на главный экран', homeHint: 'Открывать Keeper как обычное приложение', homeDone: 'Готово — подтвердите добавление значка',
+    rating: 'Рейтинг пригласивших', ratingBtn: '🏆 Рейтинг', ratingEmpty: 'Пока никто никого не пригласил — станьте первым.', ratingPrizes: 'Призы трём первым местам: {a}, {b} и {c} дней Pro.',
+    ratingMine: 'Вы пригласили: {n}', friends: 'друзей',
+    aPrize: '🏆 Наградить топ-3 рейтинга', aPrizeAsk: 'Начислить призы трём первым местам рейтинга приглашений?',
     cancel: 'Отмена', error: 'Не получилось загрузить', retry: 'Повторить', today: 'Сегодня', yesterday: 'Вчера',
     units: { s: 'с', m: 'мин', h: 'ч', d: 'дн' },
     kinds: { text: 'Текст', photo: 'Фото', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое', audio: 'Аудио', document: 'Файл', animation: 'GIF', sticker: 'Стикер', other: 'Другое' },
@@ -485,7 +507,17 @@ const TEXTS = {
     promoTitle: 'Promokodlar', promoCodeLabel: 'Kod', promoDays: 'Kun', promoUses: 'Marta', create: 'Promokod yaratish', promoNone: "Promokodlar hali yo'q",
     promoUsed: '{m} tadan {u} tasi ishlatilgan · {d} kun Pro', del: "O'chirish",
     setTitle: 'Narx va cheklovlar', save: 'Saqlash', setNote: "Yangi narx yangi obunalar uchun amal qiladi: to'lab bo'lganlar uchun avvalgisi qoladi.", badValues: 'Qiymatlarni tekshiring', saved2: 'Saqlandi',
-    setNames: { stars: 'Pro narxi, oyiga yulduz', trialDays: 'Sinov Pro, kun', refDays: 'Taklif uchun, kun Pro', freeDays: 'Pro siz saqlash, kun', proDays: 'Pro bilan saqlash, kun', freeFeed: 'Pro siz tarixdagi yozuvlar', proFeed: 'Pro bilan tarixdagi yozuvlar' },
+    setNames: { stars: 'Pro narxi, oyiga yulduz', yearStars: 'Bir yil narxi, yulduz', trialDays: 'Sinov Pro, kun', refDays: 'Taklif uchun, kun Pro', freeDays: 'Pro siz saqlash, kun', proDays: 'Pro bilan saqlash, kun', freeFeed: 'Pro siz tarixdagi yozuvlar', proFeed: 'Pro bilan tarixdagi yozuvlar' },
+    namesTitle: 'Avvalgi ismlar', namesTill: '{d} gacha', renamed: "ismini o'zgartirdi",
+    alertClear: '«Chat tozalandi» ogohlantirishi', alertClearHint: "Birdaniga {n} va undan ko'p xabar o'chirilsa xabar berish — jim rejimda ham",
+    buyYear: 'Bir yil — ⭐️ {stars}', yearSave: '−{p}%', yearHint: "365 kunga bir martalik to'lov, avtomatik uzaytirishsiz",
+    gift: "Do'stga Pro sovg'a qilish", giftHint: "{d} kun Pro ⭐️ {stars} ga. Do'stingiz botni ishga tushirgan bo'lishi kerak.", giftPlaceholder: "Do'stning ID yoki @username", giftBtn: "Sovg'a qilish",
+    giftAsk: "{name} ga {d} kunlik Pro sovg'a qilinsinmi?", giftDone: "Sovg'a yuborildi 🎁",
+    exportAll: "Barcha ma'lumotlarni chiqarish", exportAllHint: 'Barcha chatlar bitta faylda — bot bilan chatga keladi',
+    home: 'Bosh ekranga belgi', homeHint: 'Keeper ni oddiy ilova kabi ochish', homeDone: "Tayyor — belgi qo'shishni tasdiqlang",
+    rating: 'Taklif qilganlar reytingi', ratingBtn: '🏆 Reyting', ratingEmpty: "Hozircha hech kim hech kimni taklif qilmagan — birinchi bo'ling.", ratingPrizes: "Birinchi uch o'ringa sovrinlar: {a}, {b} va {c} kun Pro.",
+    ratingMine: 'Siz taklif qilgansiz: {n}', friends: "do'st",
+    aPrize: "🏆 Reytingning top-3 tasini taqdirlash", aPrizeAsk: "Takliflar reytingining birinchi uch o'rniga sovrinlar berilsinmi?",
     cancel: 'Bekor qilish', error: "Yuklab bo'lmadi", retry: 'Qayta urinish', today: 'Bugun', yesterday: 'Kecha',
     units: { s: 's', m: 'daq', h: 'soat', d: 'kun' },
     kinds: { text: 'Matn', photo: 'Rasm', video: 'Video', video_note: 'Dumaloq video', voice: 'Ovozli xabar', audio: 'Audio', document: 'Fayl', animation: 'GIF', sticker: 'Stiker', other: 'Boshqa' },
@@ -562,7 +594,17 @@ const TEXTS = {
     promoTitle: 'Promo codes', promoCodeLabel: 'Code', promoDays: 'Days', promoUses: 'Uses', create: 'Create a promo code', promoNone: 'No promo codes yet',
     promoUsed: 'used {u} of {m} · {d} days of Pro', del: 'Delete',
     setTitle: 'Price and limits', save: 'Save', setNote: 'The new price applies to new subscriptions: people who already paid keep the old one.', badValues: 'Check the values', saved2: 'Saved',
-    setNames: { stars: 'Pro price, stars a month', trialDays: 'Pro trial, days', refDays: 'Per invite, days of Pro', freeDays: 'Storage without Pro, days', proDays: 'Storage with Pro, days', freeFeed: 'History records without Pro', proFeed: 'History records with Pro' },
+    setNames: { stars: 'Pro price, stars a month', yearStars: 'Year price, stars', trialDays: 'Pro trial, days', refDays: 'Per invite, days of Pro', freeDays: 'Storage without Pro, days', proDays: 'Storage with Pro, days', freeFeed: 'History records without Pro', proFeed: 'History records with Pro' },
+    namesTitle: 'Previous names', namesTill: 'until {d}', renamed: 'changed their name',
+    alertClear: '“Chat cleared” alert', alertClearHint: 'Tell me when {n} or more messages are deleted at once — even in quiet mode',
+    buyYear: 'A year — ⭐️ {stars}', yearSave: '−{p}%', yearHint: 'One payment for 365 days, no auto-renewal',
+    gift: 'Gift Pro to a friend', giftHint: '{d} days of Pro for ⭐️ {stars}. Your friend must have started the bot.', giftPlaceholder: 'Friend’s ID or @username', giftBtn: 'Gift',
+    giftAsk: 'Gift {d} days of Pro to {name}?', giftDone: 'Gift sent 🎁',
+    exportAll: 'Export all data', exportAllHint: 'Every chat in one file — it arrives in the chat with the bot',
+    home: 'Add to home screen', homeHint: 'Open Keeper like a regular app', homeDone: 'Done — confirm adding the icon',
+    rating: 'Invite ranking', ratingBtn: '🏆 Ranking', ratingEmpty: 'Nobody has invited anyone yet — be the first.', ratingPrizes: 'Prizes for the top three: {a}, {b} and {c} days of Pro.',
+    ratingMine: 'You invited: {n}', friends: 'friends',
+    aPrize: '🏆 Reward the top 3', aPrizeAsk: 'Give the prizes to the top three of the invite ranking?',
     cancel: 'Cancel', error: 'Could not load', retry: 'Try again', today: 'Today', yesterday: 'Yesterday',
     units: { s: 's', m: 'min', h: 'h', d: 'd' },
     kinds: { text: 'Text', photo: 'Photo', video: 'Video', video_note: 'Video message', voice: 'Voice message', audio: 'Audio', document: 'File', animation: 'GIF', sticker: 'Sticker', other: 'Other' },
@@ -597,6 +639,9 @@ const ICON = {
   gift: '<path d="M4 11h16v9H4v-9ZM3 7h18v4H3V7ZM12 7v13M12 7c-1-3-5-3-5-.5S10 7 12 7Zm0 0c1-3 5-3 5-.5S14 7 12 7Z"/>',
   megaphone: '<path d="M4 10v4h3l8 5V5L7 10H4Z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  left: '<path d="M15 6l-6 6 6 6"/>',
+  home: '<path d="M4 11l8-7 8 7v9h-5v-6h-6v6H4v-9Z"/>',
+  trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0V4ZM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   safe: '<rect x="3" y="4" width="18" height="15" rx="2"/><circle cx="12" cy="11.500" r="3"/><path d="M7 19v2M17 19v2M12 8.500v-1"/>',
   ticket: '<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8Z"/><path d="M14 6v12" stroke-dasharray="2 2"/>',
@@ -890,7 +935,8 @@ async function showChats() {
 }
 
 function chatRow(c) {
-  const sub = c.eventAt
+  const fresh = c.renamedAt && Date.now() / 1000 - c.renamedAt < 7 * 86400; // имя сменили за последнюю неделю
+  const sub = fresh ? `✏️ ${L.renamed} · ${shortDate(c.renamedAt)}` : c.eventAt
     ? `${c.username ? `@${c.username} · ` : ''}${L.lastEvent} ${stamp(c.eventAt)}`
     : `${c.username ? `@${c.username} · ` : ''}${num(c.saved)} ${L.msgs}, ${L.noEvents}`;
   return h('button', { class: 'row', onclick: () => { haptic(); openChat = c; filter = 'all'; go('chats'); } },
@@ -924,6 +970,7 @@ async function showChat() {
   };
   paintMute();
 
+  const namesBox = h('div', {});
   const favBtn = h('button', { class: 'btn' });
   const paintFav = () => favBtn.replaceChildren(c.fav ? '⭐' : h('i', { html: icon('star', 17) }), c.fav ? L.unfav : L.fav);
   favBtn.onclick = async () => {
@@ -962,6 +1009,7 @@ async function showChat() {
     h('div', { class: 'card' },
       h('div', { class: 'kv' }, h('span', {}, L.first), h('b', {}, c.firstAt ? `${midDate(c.firstAt)}, ${clock(c.firstAt)}` : '—')),
       h('div', { class: 'kv' }, h('span', {}, L.last), h('b', {}, c.lastAt ? `${midDate(c.lastAt)}, ${clock(c.lastAt)}` : '—'))),
+    namesBox,
     segmented(showChat),
     listBox,
   ));
@@ -971,6 +1019,12 @@ async function showChat() {
   if (openChat !== c) return;
   remember(data);
   listBox.replaceChildren(...listOf(data.items, false));
+  // Прежние имена собеседника (если он их менял).
+  if (data.names?.length) {
+    namesBox.replaceChildren(h('div', { class: 'section', style: 'margin-top:8px' }, `✏️ ${L.namesTitle}`),
+      h('div', { class: 'card', style: 'padding:3px 0' }, data.names.map((n) => h('div', { class: 'oldname' },
+        h('b', {}, [n.name || '—', n.username && `@${n.username}`].filter(Boolean).join(' · ')), h('span', {}, fill(L.namesTill, { d: shortDate(n.at) }))))));
+  }
 }
 
 // ============================================================================
@@ -1001,8 +1055,23 @@ async function showFeed() {
   await fetchFeed();
 }
 
+// Записи текущего списка — по ним можно листать фото и видео в просмотре.
+let currentItems = [];
+const isShot = (item) => item.kind === 'photo' || (item.kind === 'document' && /^image\/(jpeg|png|webp|gif)/.test(item.meta?.mime || ''));
+const viewable = (item) => me?.pro && item.hasFile && (item.meta?.size || 0) <= (me.inlineMedia || 0)
+  && (isShot(item) || ['video', 'video_note'].includes(item.kind));
+// Открывает фото или видео записи на весь экран (с процентом загрузки).
+async function viewItem(item) {
+  toast(L.loadingMedia);
+  try {
+    const { url } = await mediaUrl(item.id, false, null, (share) => { if (share < 1) toast(percent(share)); });
+    openViewer({ type: isShot(item) ? 'image' : 'video', url, item });
+  } catch (err) { tg.showAlert(err.message || L.mediaErr); }
+}
+
 // Что показать, если список пуст, и чем его рисовать: галереей (для «Медиа») или карточками.
 function listOf(items, withName, searching = false) {
+  currentItems = items;
   if (!items.length) {
     if (searching) return [empty(L.notFound, '', 'search')];
     if (filter === 'kept') return [empty(L.emptyKept, L.emptyKeptHint, 'star')];
@@ -1028,8 +1097,7 @@ function gallery(items) {
       haptic();
       if (!me.pro) return toast(L.fileLocked);
       if (!small) { try { toast((await call('sendMedia', { id: item.id })).message); } catch (err) { tg.showAlert(err.message || L.error); } return; }
-      toast(L.loadingMedia);
-      try { const { url } = await mediaUrl(item.id, false, null, (share) => { if (share < 1) toast(percent(share)); }); openViewer({ type: isPhoto ? 'image' : 'video', url, item }); } catch (err) { tg.showAlert(err.message || L.mediaErr); }
+      viewItem(item);
     };
     return cell;
   }));
@@ -1228,20 +1296,32 @@ function openViewer({ type, url, item, edit = null }) {
     ? h('img', { src: url, alt: '', draggable: 'false' })
     : h('video', { src: url, controls: '', autoplay: '', playsinline: '' });
   const stage = h('div', { class: 'stage' }, media);
+  // Соседние фото и видео из того же списка — для листания. У прежних версий файла (edit) листания нет.
+  const list = edit === null ? currentItems.filter(viewable) : [];
+  const index = list.findIndex((x) => x.id === item.id);
+  const step = (d) => { const next = list[index + d]; if (next) { haptic(); viewItem(next); } };
   const bar = h('div', { class: 'bar' },
     h('button', { class: 'x', html: icon('x', 20), onclick: closeViewer }),
-    h('div', {}, h('b', {}, item.name), h('span', {}, `${dayName(item.date)}, ${clock(item.date)}`)));
+    h('div', {}, h('b', {}, item.name), h('span', {}, `${dayName(item.date)}, ${clock(item.date)}`)),
+    index >= 0 && list.length > 1 && [
+      h('span', { class: 'count' }, `${index + 1} / ${list.length}`),
+      h('button', { class: 'nav-btn', html: icon('left', 20), disabled: index === 0 ? '' : null, onclick: () => step(-1) }),
+      h('button', { class: 'nav-btn', html: icon('chev', 20), disabled: index === list.length - 1 ? '' : null, onclick: () => step(1) }),
+    ]);
   const foot = h('div', { class: 'foot' }, item.text && edit === null && h('p', {}, item.text), toChatButton(item, L.getFile, edit));
   viewer = h('div', { class: 'viewer' }, bar, stage, foot);
   document.body.append(viewer);
   tg.BackButton.show();
 
   if (type !== 'image') { media.onerror = () => { closeViewer(); tg.showAlert(L.mediaErr); }; return; }
-  // Жесты для фото.
+  // Жесты для фото: щипок — приблизить, двойное касание — приблизить и вернуть,
+  // без увеличения: влево-вправо — листать, вниз — закрыть.
   let scale = 1; let x = 0; let y = 0; let start = null; let lastTap = 0;
   const paint = (smooth) => {
-    const maxX = (stage.clientWidth * (scale - 1)) / 2; const maxY = (stage.clientHeight * (scale - 1)) / 2;
-    x = Math.max(-maxX, Math.min(maxX, x)); y = Math.max(-maxY, Math.min(maxY, y));
+    if (scale > 1) { // при увеличении не даём утащить картинку за край
+      const maxX = (stage.clientWidth * (scale - 1)) / 2; const maxY = (stage.clientHeight * (scale - 1)) / 2;
+      x = Math.max(-maxX, Math.min(maxX, x)); y = Math.max(-maxY, Math.min(maxY, y));
+    }
     media.style.transition = smooth ? 'transform .2s' : 'none';
     media.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
     bar.style.opacity = foot.style.opacity = scale > 1 ? '0' : '1';
@@ -1250,7 +1330,7 @@ function openViewer({ type, url, item, edit = null }) {
   const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   stage.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) start = { d: dist(e.touches), scale };
-    else if (e.touches.length === 1) start = { px: e.touches[0].clientX, py: e.touches[0].clientY, x, y, moved: false };
+    else if (e.touches.length === 1) start = { px: e.touches[0].clientX, py: e.touches[0].clientY, x, y, moved: false, axis: null };
   }, { passive: true });
   stage.addEventListener('touchmove', (e) => {
     if (!start) return;
@@ -1259,14 +1339,23 @@ function openViewer({ type, url, item, edit = null }) {
     else if (e.touches.length === 1 && start.px !== undefined) {
       const dx = e.touches[0].clientX - start.px; const dy = e.touches[0].clientY - start.py;
       if (Math.abs(dx) + Math.abs(dy) > 8) start.moved = true;
-      if (scale > 1) { x = start.x + dx; y = start.y + dy; } else y = start.y + dy; // без увеличения — тянем вниз, чтобы закрыть
+      if (scale > 1) { x = start.x + dx; y = start.y + dy; }
+      else {
+        // Без увеличения двигаем только по одной оси: по той, куда палец пошёл сначала.
+        if (!start.axis && start.moved) start.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        x = start.axis === 'x' ? dx : 0;
+        y = start.axis === 'y' ? Math.max(0, dy) : 0;
+      }
     }
     paint(false);
   }, { passive: false });
   stage.addEventListener('touchend', (e) => {
     if (e.touches.length) { start = null; return; }
-    if (scale <= 1 && Math.abs(y) > 110) return closeViewer();
-    if (scale <= 1) { x = 0; y = 0; }
+    if (scale <= 1) {
+      if (y > 110) return closeViewer();
+      if (Math.abs(x) > 70 && list[index + (x < 0 ? 1 : -1)]) return step(x < 0 ? 1 : -1);
+      x = 0; y = 0;
+    }
     const tap = start && !start.moved && start.px !== undefined;
     start = null;
     if (tap) {
@@ -1275,10 +1364,16 @@ function openViewer({ type, url, item, edit = null }) {
     }
     paint(true);
   });
-  // На компьютере: двойной щелчок и колесо мыши.
+  // На компьютере: двойной щелчок, колесо мыши и стрелки на клавиатуре.
   stage.addEventListener('dblclick', () => { scale = scale > 1 ? 1 : 2.500; x = 0; y = 0; paint(true); });
   stage.addEventListener('wheel', (e) => { e.preventDefault(); scale = Math.max(1, Math.min(6, scale * (e.deltaY < 0 ? 1.150 : 0.870))); paint(false); }, { passive: false });
 }
+document.addEventListener('keydown', (e) => {
+  if (!viewer) return;
+  if (e.key === 'Escape') closeViewer();
+  if (e.key === 'ArrowLeft') viewer.querySelector('.nav-btn')?.click();
+  if (e.key === 'ArrowRight') viewer.querySelectorAll('.nav-btn')[1]?.click();
+});
 
 // Значок файла по расширению: цвет и короткая подпись.
 const EXT_COLOR = { pdf: '#e5484d', doc: '#2f7cf6', docx: '#2f7cf6', rtf: '#2f7cf6', odt: '#2f7cf6', xls: '#2fb36a', xlsx: '#2fb36a', csv: '#2fb36a', ods: '#2fb36a',
@@ -1320,6 +1415,7 @@ function mediaBox(item) {
     box.load = () => mediaUrl(item.id, false, null, progress).then(({ url }) => {
       const img = h('img', { src: url, alt: '' });
       if (kind !== 'sticker') img.onclick = () => { haptic(); openViewer({ type: 'image', url, item }); };
+      img.style.cursor = kind === 'sticker' ? '' : 'zoom-in';
       box.replaceChildren(img);
     }, fail);
     lazy.observe(box);
@@ -1428,11 +1524,11 @@ async function showMe() {
   const save = async (input) => { try { remember(await call('settings', input)); } catch { toast(L.error); } showMe(); };
   const perks = (n) => h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n, d: me.proDays }))));
 
-  async function buy(btn) {
+  async function buy(btn, plan = 'month') {
     haptic('medium');
     btn.disabled = true;
     try {
-      const { url } = await call('invoice');
+      const { url } = await call('invoice', { plan });
       tg.openInvoice(url, async (status) => {
         if (status === 'paid') { toast(L.paid); setTimeout(async () => { try { remember(await call('chats')); } catch { /* обновится позже */ } showMe(); }, 1500); }
         else if (status === 'failed') toast(L.payFail);
@@ -1449,7 +1545,12 @@ async function showMe() {
   } else {
     const btn = h('button', { class: 'btn' }, fill(L.buy, { stars: me.stars }));
     btn.onclick = () => buy(btn);
-    plan = h('div', { class: 'plan' }, h('small', {}, L.planNow), h('h2', {}, L.planFree), h('p', {}, fill(L.freeDesc, { d: me.freeDays })), perks(me.proLimit), btn);
+    // Год: показываем, сколько процентов экономит по сравнению с двенадцатью месяцами.
+    const off = Math.round((1 - me.yearStars / (me.stars * 12)) * 100);
+    const year = h('button', { class: 'btn alt' }, fill(L.buyYear, { stars: me.yearStars }), off > 0 && h('span', { class: 'save' }, fill(L.yearSave, { p: off })));
+    year.onclick = () => buy(year, 'year');
+    plan = h('div', { class: 'plan' }, h('small', {}, L.planNow), h('h2', {}, L.planFree), h('p', {}, fill(L.freeDesc, { d: me.freeDays })), perks(me.proLimit), btn, year,
+      h('p', { style: 'margin-top:6px; font-size:12px; opacity:.85; position:relative; z-index:1' }, L.yearHint));
   }
 
   // Порядок на экране: тихо, коротко, раз в день, полностью (числа — режимы на сервере).
@@ -1492,6 +1593,39 @@ async function showMe() {
     try { const res = await call('promo', { code }); remember(res.profile); tg.showAlert(res.message); showMe(); } catch (err) { tg.showAlert(err.message || L.error); }
   };
 
+  // Подарок другу: ищем человека, спрашиваем подтверждение, открываем оплату.
+  const giftInput = h('input', { class: 'field', type: 'text', placeholder: L.giftPlaceholder, maxlength: '40' });
+  const sendGift = async () => {
+    const to = giftInput.value.trim();
+    if (!to) return;
+    haptic('medium');
+    let res;
+    try { res = await call('invoice', { plan: 'gift', to }); } catch (err) { return tg.showAlert(err.message || L.error); }
+    tg.showConfirm(fill(L.giftAsk, { d: me.giftDays, name: res.to.name }), (ok) => {
+      if (ok) tg.openInvoice(res.url, (status) => { if (status === 'paid') { giftInput.value = ''; toast(L.giftDone); } else if (status === 'failed') toast(L.payFail); });
+    });
+  };
+  const exportAll = async () => {
+    haptic('medium');
+    if (!me.pro) return toast(L.fileLocked);
+    toast(L.exporting);
+    try { toast((await call('export', { all: true })).message); } catch (err) { tg.showAlert(err.message || L.error); }
+  };
+  const rating = async () => {
+    haptic();
+    let data;
+    try { data = await call('top'); } catch { return toast(L.error); }
+    const shade = h('div', { class: 'shade', onclick: (e) => { if (e.target === shade) shade.remove(); } },
+      h('div', { class: 'sheet' }, h('h3', {}, `🏆 ${L.rating}`),
+        h('p', {}, `${fill(L.ratingPrizes, { a: data.prizes[0], b: data.prizes[1], c: data.prizes[2] })} ${fill(L.ratingMine, { n: data.mine })}`),
+        data.top.length ? data.top.map((r) => h('div', { class: `toprow${r.me ? ' me' : ''}` },
+          h('div', { class: 'place' }, ['🥇', '🥈', '🥉'][r.place - 1] || r.place), h('div', { class: 'nm' }, r.name), h('b', {}, `👥 ${r.n}`)))
+          : h('div', { class: 'hint', style: 'padding:6px 0 14px' }, L.ratingEmpty),
+        h('button', { class: 'btn', style: 'margin-top:10px', onclick: () => shade.remove() }, L.close)));
+    document.body.append(shade);
+  };
+  const canHome = typeof tg.addToHomeScreen === 'function';
+
   const link = me.bot ? `https://t.me/${me.bot}?start=ref_${me.id}` : '';
   const copy = async () => { try { await navigator.clipboard.writeText(link); toast(L.copied); } catch { tg.showAlert(link); } };
 
@@ -1512,8 +1646,12 @@ async function showMe() {
         h('div', { class: 'reflink' }, link),
         h('div', { class: 'actions', style: 'margin-top:0' },
           h('button', { class: 'btn primary', onclick: () => { haptic(); tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(L.shareText)}`); } }, h('i', { html: icon('send', 16) }), L.shareBtn),
-          h('button', { class: 'btn', onclick: copy }, L.copy))),
+          h('button', { class: 'btn', onclick: copy }, L.copy)),
+        h('button', { class: 'btn', style: 'margin-top:8px; width:100%', onclick: rating }, L.ratingBtn)),
     ],
+    h('div', { class: 'section' }, L.gift),
+    h('div', { class: 'card pad' }, h('div', { class: 'inline' }, giftInput, h('button', { class: 'btn primary', onclick: sendGift }, L.giftBtn)),
+      h('div', { class: 'hint', style: 'margin-top:8px' }, fill(L.giftHint, { d: me.giftDays, stars: me.stars }))),
     h('div', { class: 'section' }, L.promo),
     h('div', { class: 'card pad' }, h('div', { class: 'inline' }, promoInput, h('button', { class: 'btn primary', onclick: applyPromo }, L.apply))),
     h('div', { class: 'section' }, L.theme),
@@ -1539,11 +1677,24 @@ async function showMe() {
         h('div', { class: `ic ${me.vault ? 'green' : 'violet'}`, html: icon('safe', 18) }),
         h('div', { class: 'mid' }, h('div', {}, L.vault), h('small', {}, me.vault ? fill(L.vaultOnHint, { t: me.vault }) : L.vaultOffHint)),
         h('i', { class: 'chev', html: icon('chev', 18) })),
+      h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ alertClear: !me.alertClear }); } },
+        h('div', { class: 'ic red', html: icon('bell', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.alertClear), h('small', {}, fill(L.alertClearHint, { n: me.clearAlert }))),
+        h('div', { class: `switch${me.alertClear ? ' on' : ''}` })),
       h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ weekly: !me.weekly }); } },
         h('div', { class: 'ic amber', html: icon('report', 18) }),
         h('div', { class: 'mid' }, h('div', {}, L.weekly), h('small', {}, L.weeklyHint)),
         h('div', { class: `switch${me.weekly ? ' on' : ''}` }))),
     !me.connected && [h('div', { class: 'section' }, L.how), h('div', { class: 'card' }, h('ol', { class: 'steps' }, L.steps.map((s) => h('li', {}, s))))],
+    h('div', { class: 'card' },
+      h('button', { class: 'opt', onclick: exportAll },
+        h('div', { class: 'ic', html: icon('download', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.exportAll), h('small', {}, L.exportAllHint)),
+        h('i', { class: 'chev', html: icon('chev', 18) })),
+      canHome && h('button', { class: 'opt', onclick: () => { haptic(); try { tg.addToHomeScreen(); toast(L.homeDone); } catch { toast(L.error); } } },
+        h('div', { class: 'ic violet', html: icon('home', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.home), h('small', {}, L.homeHint)),
+        h('i', { class: 'chev', html: icon('chev', 18) }))),
     h('div', { class: 'card' },
       h('button', { class: 'opt', onclick: () => tg.showConfirm(L.wipeAsk, (ok) => { if (ok) { chatsCache = []; save({ wipe: true }).then(() => toast(L.wiped)); } }) },
         h('div', { class: 'ic red', html: icon('trash', 18) }),
@@ -1691,6 +1842,7 @@ async function showAdmin(input = {}) {
         h('label', {}, h('b', {}, p.code), h('small', {}, fill(L.promoUsed, { u: p.used, m: p.maxUses, d: p.days }))),
         h('button', { class: 'mini', style: 'margin:0; color:var(--red)', onclick: () => act({ action: 'promoDel', code: p.code }) }, L.del)))
         : h('div', { class: 'hint', style: 'margin-top:10px' }, L.promoNone)),
+    me.boss && h('button', { class: 'btn', style: 'width:100%; margin:0 0 10px; background:var(--card)', onclick: () => tg.showConfirm(L.aPrizeAsk, (ok) => { if (ok) act({ action: 'refPrize' }); }) }, L.aPrize),
     me.boss && h('div', { class: 'section' }, L.setTitle),
     me.boss && h('div', { class: 'card pad' }, setRows,
       h('button', { class: 'btn primary', style: 'margin-top:6px; width:100%', onclick: saveSettings }, L.save),
