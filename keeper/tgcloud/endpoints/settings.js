@@ -5,6 +5,7 @@
 //   { mute: { chatId, muted } }       — отключить уведомления по одному собеседнику
 //   { fav: { chatId, fav } }          — добавить собеседника в избранные
 //   { keep: { id, on } }              — поставить или снять закладку (сообщение не сотрётся по сроку хранения)
+//   { stick: { id, on } }             — закрепить сообщение вверху страницы собеседника (или открепить)
 //   { weekly: true|false }            — присылать ли отчёт за неделю
 //   { alertClear: true|false }        — предупреждать ли, когда разом удалили много сообщений
 //   { wipe: true }                    — удалить все сохранённые сообщения
@@ -12,7 +13,7 @@
 import { EndpointError } from 'sdk';
 import { NOTIFY, LIMITS } from '../lib/config.js';
 import { LANGS, t } from '../lib/i18n.js';
-import { setPrefs, setMuted, setFav, setKept, isPro, wipeUser } from '../lib/store.js';
+import { setPrefs, setMuted, setFav, setKept, setPinned, isPro, wipeUser } from '../lib/store.js';
 import { whoami } from '../lib/app.js';
 
 const chatOf = (value) => (value && Number.isFinite(Number(value.chatId)) ? Number(value.chatId) : null);
@@ -32,6 +33,11 @@ export default async function (input, ctx) {
     const done = await setKept(user, Number(input.keep.id), Boolean(input.keep.on));
     if (done === null) throw new EndpointError(t(user.lang, 'notFound'), { code: 'NOT_FOUND' });
     if (done === false) throw new EndpointError(t(user.lang, 'keptLimit', { n: isPro(user) ? LIMITS.proKept : LIMITS.freeKept }), { code: 'KEPT_LIMIT' });
+  }
+  if (input.stick && Number.isFinite(Number(input.stick.id))) {
+    const done = await setPinned(user, Number(input.stick.id), Boolean(input.stick.on));
+    if (done === null) throw new EndpointError(t(user.lang, 'notFound'), { code: 'NOT_FOUND' });
+    if (done === false) throw new EndpointError(t(user.lang, 'pinLimit', { n: LIMITS.pinsPerChat }), { code: 'PIN_LIMIT' });
   }
   if (input.wipe === true) await wipeUser(user.id);
   return (await whoami(ctx, input)).profile;

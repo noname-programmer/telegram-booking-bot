@@ -69,7 +69,7 @@ export function toItem(r) {
     id: r.id, chatId: r.chatId, name: r.fromName, username: r.username ?? '', fromId: r.fromId ?? null,
     kind: r.kind, text: r.text, date: r.date, at: r.at,
     deletedAt: r.deletedAt ?? null, editedAt: r.editedAt ?? null,
-    hasFile: Boolean(r.fileId), hasThumb: Boolean(thumb), kept: Boolean(r.kept),
+    hasFile: Boolean(r.fileId), hasThumb: Boolean(thumb), kept: Boolean(r.kept), pinned: Boolean(r.pinned),
     versions: r.versions.map((v) => ({ ...v, kind: v.kind === r.kind && !v.hasFile ? null : v.kind })),
     meta: Object.keys(meta).length ? meta : null,
   };

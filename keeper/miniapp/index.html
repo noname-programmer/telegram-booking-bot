@@ -195,18 +195,46 @@
   .skel { height: 66px; border-radius: 16px; margin-bottom: 8px; background: linear-gradient(90deg, var(--card) 25%, var(--soft) 50%, var(--card) 75%);
           background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
   @keyframes shimmer { to { background-position: -200% 0; } }
-  .fade { animation: fade .22s ease-out; }
-  @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+  /* ---------- плавные переходы ---------- */
+  .fade { animation: fade .24s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } }
+  .push { animation: push .28s cubic-bezier(.2, .8, .2, 1); }   /* открыли страницу собеседника — выезжает справа */
+  @keyframes push { from { opacity: 0; transform: translateX(28px); } }
+  .pop { animation: pop .28s cubic-bezier(.2, .8, .2, 1); }     /* вернулись назад — выезжает слева */
+  @keyframes pop { from { opacity: 0; transform: translateX(-28px); } }
+  @keyframes appear { from { opacity: 0; } }
+  .media img, .cell img, .filecard .ext img { animation: appear .3s ease-out; }
+  /* Нажатие: элемент чуть «проседает» под пальцем. */
+  .btn, .row, .opt, .tile, .cell, .mini, .star, .seg button, .banner, .keys button { transition: transform .12s ease-out, opacity .15s, background-color .18s; }
+  .btn:active, .mini:active, .star:active, .keys button:active { transform: scale(.96); }
+  .row:active, .opt:active, button.banner:active, .cell:active { transform: scale(.985); }
+  .switch, .switch::after, .radio, .radio::after { transition: all .2s cubic-bezier(.2, .8, .2, 1); }
+  .shade.out { animation: gone .18s ease-in forwards; } .shade.out .sheet { animation: down .18s ease-in forwards; }
+  @keyframes gone { to { opacity: 0; } } @keyframes down { to { transform: translateY(100%); } }
+  .viewer .stage > * { animation: zoomin .22s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes zoomin { from { opacity: 0; transform: scale(.94); } }
+  /* Кто просил систему не анимировать — тому не анимируем. */
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001s !important; transition-duration: .001s !important; } }
 
   /* ---------- нижнее меню ---------- */
   nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; justify-content: center; padding: 8px 12px calc(10px + var(--safe-b));
         pointer-events: none; }
-  nav .bar { pointer-events: auto; display: flex; gap: 2px; width: 100%; max-width: 460px; padding: 6px; border-radius: 22px; background: var(--card);
+  nav .bar { position: relative; pointer-events: auto; display: flex; gap: 2px; width: 100%; max-width: 460px; padding: 6px; border-radius: 22px; background: var(--card);
              box-shadow: 0 8px 28px rgba(0, 0, 0, .16), 0 0 0 1px var(--line); }
   nav button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px 6px; border-radius: 16px;
                color: var(--hint); font-size: 10.5px; font-weight: 650; transition: color .18s, background .18s; }
   nav button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  nav button.on { color: var(--accent); background: var(--soft); }
+  nav button { position: relative; z-index: 1; }
+  nav button.on { color: var(--accent); }
+  nav button i { transition: transform .25s cubic-bezier(.2, .8, .2, 1); } nav button.on i { transform: translateY(-1px) scale(1.08); }
+  /* Подсветка активной вкладки плавно переезжает под нужную кнопку. */
+  nav .ind { position: absolute; top: 6px; bottom: 6px; left: 6px; border-radius: 16px; background: var(--soft);
+             transition: transform .32s cubic-bezier(.2, .8, .2, 1), width .2s; }
+  .pinbtn { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 15px; flex: none; filter: grayscale(1); opacity: .45;
+            transition: transform .12s, opacity .15s, filter .15s; }
+  .pinbtn.on { filter: none; opacity: 1; } .pinbtn:active { transform: scale(.9); }
+  .pins { border-radius: var(--radius); padding: 10px 10px 2px; margin-bottom: 10px; background: linear-gradient(135deg, rgba(247, 181, 0, .16), rgba(240, 115, 27, .1)); }
+  .pins .section { margin: 2px 6px 8px; color: var(--amber); }
   .badge-vip { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 4px 9px; border-radius: 999px; color: #fff;
                background: linear-gradient(135deg, #7c5cff, #e5489d); }
   .plan.vip { background: linear-gradient(135deg, #7c5cff, #b04ce0 55%, #e5489d); }
@@ -350,8 +378,8 @@
 // ============================================================================
 const TEXTS = {
   ru: {
-    tabs: { chats: 'Чаты', feed: 'Лента', stats: 'Аналитика', me: 'Профиль', admin: 'Админ' },
-    sub: { chats: 'Кто удалял и менял сообщения', feed: 'Все события подряд', stats: 'Цифры по вашим чатам', me: 'Тариф и настройки', admin: 'Только для владельца бота' },
+    tabs: { chats: 'Чаты', feed: 'Лента', stats: 'Аналитика', me: 'Аккаунт', set: 'Настройки', admin: 'Админ-панель' },
+    sub: { chats: 'Кто удалял и менял сообщения', feed: 'Все события подряд', stats: 'Цифры по вашим чатам', me: 'Тариф, друзья и ваши данные', set: 'Уведомления, вид и защита', admin: 'Только для владельца бота' },
     people: 'Собеседников', deleted: 'Удалено', edited: 'Изменено', saved: 'Сообщений', share: 'Удаляет',
     search: 'Поиск по имени', all: 'Все', fDeleted: 'Удалённые', fEdited: 'Изменённые',
     offTitle: 'Бот не подключён', off: 'Настройки Telegram → Telegram для бизнеса → Чат-боты → впишите бота. После этого здесь появятся чаты.',
@@ -431,14 +459,17 @@ const TEXTS = {
     rating: 'Рейтинг пригласивших', ratingBtn: '🏆 Рейтинг', ratingEmpty: 'Пока никто никого не пригласил — станьте первым.', ratingPrizes: 'Призы трём первым местам: {a}, {b} и {c} дней Pro.',
     ratingMine: 'Вы пригласили: {n}', friends: 'друзей',
     aPrize: '🏆 Наградить топ-3 рейтинга', aPrizeAsk: 'Начислить призы трём первым местам рейтинга приглашений?',
+    secAlerts: 'Оповещения', secLook: 'Вид и язык', secSafe: 'Защита', secData: 'Мои данные', secStatus: 'Подключение',
+    adminOpen: 'Админ-панель', adminOpenHint: 'Пользователи, цены, промокоды, рассылка',
+    pinnedTitle: 'Закреплённые', stuck: 'Закреплено вверху страницы собеседника', unstuck: 'Откреплено',
     cancel: 'Отмена', error: 'Не получилось загрузить', retry: 'Повторить', today: 'Сегодня', yesterday: 'Вчера',
     units: { s: 'с', m: 'мин', h: 'ч', d: 'дн' },
     kinds: { text: 'Текст', photo: 'Фото', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое', audio: 'Аудио', document: 'Файл', animation: 'GIF', sticker: 'Стикер', other: 'Другое' },
     types: { contact: 'Контакт', location: 'Место на карте', poll: 'Опрос', dice: 'Кубик' },
   },
   uz: {
-    tabs: { chats: 'Chatlar', feed: 'Tasma', stats: 'Tahlil', me: 'Profil', admin: 'Admin' },
-    sub: { chats: "Kim xabarlarni o'chirgan va o'zgartirgan", feed: 'Barcha hodisalar ketma-ket', stats: "Chatlaringiz bo'yicha raqamlar", me: 'Tarif va sozlamalar', admin: 'Faqat bot egasi uchun' },
+    tabs: { chats: 'Chatlar', feed: 'Tasma', stats: 'Tahlil', me: 'Akkaunt', set: 'Sozlamalar', admin: 'Admin-panel' },
+    sub: { chats: "Kim xabarlarni o'chirgan va o'zgartirgan", feed: 'Barcha hodisalar ketma-ket', stats: "Chatlaringiz bo'yicha raqamlar", me: "Tarif, do'stlar va ma'lumotlaringiz", set: "Bildirishnomalar, ko'rinish va himoya", admin: 'Faqat bot egasi uchun' },
     people: 'Suhbatdoshlar', deleted: "O'chirilgan", edited: "O'zgartirilgan", saved: 'Xabarlar', share: "O'chiradi",
     search: "Ism bo'yicha qidirish", all: 'Hammasi', fDeleted: "O'chirilgan", fEdited: "O'zgartirilgan",
     offTitle: 'Bot ulanmagan', off: "Telegram sozlamalari → Telegram biznes uchun → Chat-botlar → botni yozing. Shundan so'ng chatlar shu yerda paydo bo'ladi.",
@@ -518,14 +549,17 @@ const TEXTS = {
     rating: 'Taklif qilganlar reytingi', ratingBtn: '🏆 Reyting', ratingEmpty: "Hozircha hech kim hech kimni taklif qilmagan — birinchi bo'ling.", ratingPrizes: "Birinchi uch o'ringa sovrinlar: {a}, {b} va {c} kun Pro.",
     ratingMine: 'Siz taklif qilgansiz: {n}', friends: "do'st",
     aPrize: "🏆 Reytingning top-3 tasini taqdirlash", aPrizeAsk: "Takliflar reytingining birinchi uch o'rniga sovrinlar berilsinmi?",
+    secAlerts: 'Ogohlantirishlar', secLook: "Ko'rinish va til", secSafe: 'Himoya', secData: "Ma'lumotlarim", secStatus: 'Ulanish',
+    adminOpen: 'Admin-panel', adminOpenHint: 'Foydalanuvchilar, narxlar, promokodlar, xabar tarqatish',
+    pinnedTitle: 'Mahkamlanganlar', stuck: 'Suhbatdosh sahifasining yuqorisiga mahkamlandi', unstuck: 'Mahkamlashdan olindi',
     cancel: 'Bekor qilish', error: "Yuklab bo'lmadi", retry: 'Qayta urinish', today: 'Bugun', yesterday: 'Kecha',
     units: { s: 's', m: 'daq', h: 'soat', d: 'kun' },
     kinds: { text: 'Matn', photo: 'Rasm', video: 'Video', video_note: 'Dumaloq video', voice: 'Ovozli xabar', audio: 'Audio', document: 'Fayl', animation: 'GIF', sticker: 'Stiker', other: 'Boshqa' },
     types: { contact: 'Kontakt', location: 'Xaritadagi joy', poll: "So'rovnoma", dice: 'Kubik' },
   },
   en: {
-    tabs: { chats: 'Chats', feed: 'Feed', stats: 'Insights', me: 'Profile', admin: 'Admin' },
-    sub: { chats: 'Who deleted and edited messages', feed: 'Every event in one place', stats: 'Numbers for your chats', me: 'Plan and settings', admin: 'Bot owner only' },
+    tabs: { chats: 'Chats', feed: 'Feed', stats: 'Insights', me: 'Account', set: 'Settings', admin: 'Admin panel' },
+    sub: { chats: 'Who deleted and edited messages', feed: 'Every event in one place', stats: 'Numbers for your chats', me: 'Plan, friends and your data', set: 'Notifications, look and protection', admin: 'Bot owner only' },
     people: 'People', deleted: 'Deleted', edited: 'Edited', saved: 'Messages', share: 'Deletes',
     search: 'Search by name', all: 'All', fDeleted: 'Deleted', fEdited: 'Edited',
     offTitle: 'The bot is not connected', off: 'Telegram Settings → Telegram Business → Chatbots → enter the bot. Your chats will then appear here.',
@@ -605,6 +639,9 @@ const TEXTS = {
     rating: 'Invite ranking', ratingBtn: '🏆 Ranking', ratingEmpty: 'Nobody has invited anyone yet — be the first.', ratingPrizes: 'Prizes for the top three: {a}, {b} and {c} days of Pro.',
     ratingMine: 'You invited: {n}', friends: 'friends',
     aPrize: '🏆 Reward the top 3', aPrizeAsk: 'Give the prizes to the top three of the invite ranking?',
+    secAlerts: 'Alerts', secLook: 'Look and language', secSafe: 'Protection', secData: 'My data', secStatus: 'Connection',
+    adminOpen: 'Admin panel', adminOpenHint: 'Users, prices, promo codes, broadcast',
+    pinnedTitle: 'Pinned', stuck: 'Pinned to the top of this person’s page', unstuck: 'Unpinned',
     cancel: 'Cancel', error: 'Could not load', retry: 'Try again', today: 'Today', yesterday: 'Yesterday',
     units: { s: 's', m: 'min', h: 'h', d: 'd' },
     kinds: { text: 'Text', photo: 'Photo', video: 'Video', video_note: 'Video message', voice: 'Voice message', audio: 'Audio', document: 'File', animation: 'GIF', sticker: 'Sticker', other: 'Other' },
@@ -639,6 +676,7 @@ const ICON = {
   gift: '<path d="M4 11h16v9H4v-9ZM3 7h18v4H3V7ZM12 7v13M12 7c-1-3-5-3-5-.5S10 7 12 7Zm0 0c1-3 5-3 5-.5S14 7 12 7Z"/>',
   megaphone: '<path d="M4 10v4h3l8 5V5L7 10H4Z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  set: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M5.600 18.400l1.800-1.800M16.600 7.400l1.800-1.800"/>',
   left: '<path d="M15 6l-6 6 6 6"/>',
   home: '<path d="M4 11l8-7 8 7v9h-5v-6h-6v6H4v-9Z"/>',
   trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0V4ZM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4"/>',
@@ -703,6 +741,26 @@ let openChat = null;    // открытый собеседник (или null)
 let filter = 'all';     // фильтр ленты: all | deleted | edited
 let query = '';         // строка поиска по чатам
 let chatsCache = [];
+let adminOpen = false;  // открыта ли админ-панель (она живёт внутри вкладки «Аккаунт»)
+let listScroll = 0;     // на каком месте был список чатов, когда открыли собеседника
+
+// Анимация появления экрана: 'fade' — сменили вкладку, 'push' — зашли глубже, 'pop' — вернулись назад.
+// Срабатывает один раз: когда экран перерисовывается с новыми данными, он уже не «прыгает».
+let enterKind = 'fade';
+const enter = () => { const kind = enterKind; enterKind = ''; return kind; };
+
+// Память на уже загруженные экраны: при возврате показываем их сразу, а свежие данные подгружаем в фоне.
+const memo = new Map();
+const forget = (prefix = '') => { for (const key of [...memo.keys()]) if (key.startsWith(prefix)) memo.delete(key); };
+async function swr(key, fetcher, paint, alive, retry, skeleton = 5) {
+  const cached = memo.get(key);
+  if (cached) paint(cached.data); else loading(skeleton);
+  let data;
+  try { data = await fetcher(); } catch { if (!cached && alive()) failed(retry); return; }
+  const text = JSON.stringify(data);
+  memo.set(key, { data, text });
+  if (alive() && (!cached || cached.text !== text)) paint(data); // перерисовываем, только если что-то изменилось
+}
 
 const $ = (id) => document.getElementById(id);
 const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
@@ -769,27 +827,38 @@ function toast(text) {
 // ============================================================================
 // Каркас: шапка, нижнее меню, смена экранов.
 // ============================================================================
+const TABS = ['chats', 'feed', 'stats', 'me', 'set'];
+let navLang = '';
 function chrome() {
-  const title = openChat && tab === 'chats' ? openChat.name : L.tabs[tab];
-  $('title').textContent = tab === 'chats' && !openChat ? 'Keeper' : title;
-  $('subtitle').textContent = openChat && tab === 'chats' ? (openChat.username ? `@${openChat.username}` : L.sub.chats) : L.sub[tab];
-  $('logo').innerHTML = icon('shield', 24);
+  const inChat = openChat && tab === 'chats';
+  const inAdmin = adminOpen && tab === 'me';
+  $('title').textContent = inChat ? openChat.name : inAdmin ? L.tabs.admin : tab === 'chats' ? 'Keeper' : L.tabs[tab];
+  $('subtitle').textContent = inChat ? (openChat.username ? `@${openChat.username}` : L.sub.chats) : inAdmin ? L.sub.admin : L.sub[tab];
+  if (!$('logo').firstChild) $('logo').innerHTML = icon('shield', 24);
   const badge = $('plan-badge');
-  badge.replaceChildren(me ? planBadge(me.plan) : '');
+  if (badge.dataset.plan !== `${me?.plan}:${lang}`) { badge.dataset.plan = `${me?.plan}:${lang}`; badge.replaceChildren(me ? planBadge(me.plan) : ''); }
 
-  const names = ['chats', 'feed', 'stats', 'me'];
-  if (me?.admin) names.push('admin');
-  $('nav').replaceChildren(...names.map((name) => h('button', {
-    class: name === tab ? 'on' : '',
-    onclick: () => { haptic(); go(name); },
-  }, h('i', { html: icon(name, 22) }), h('span', {}, L.tabs[name]))));
+  // Нижнее меню строим один раз (и заново — только при смене языка), дальше лишь двигаем подсветку.
+  const nav = $('nav');
+  if (navLang !== lang) {
+    navLang = lang;
+    nav.replaceChildren(h('div', { class: 'ind' }), ...TABS.map((name) => h('button', {
+      'data-tab': name, onclick: () => { haptic(); if (name === tab && !openChat && !adminOpen) window.scrollTo({ top: 0, behavior: 'smooth' }); else go(name); },
+    }, h('i', { html: icon(name, 22) }), h('span', {}, L.tabs[name]))));
+  }
+  for (const btn of nav.querySelectorAll('button')) btn.classList.toggle('on', btn.dataset.tab === tab);
+  const ind = nav.querySelector('.ind');
+  ind.style.width = `calc((100% - 12px - ${(TABS.length - 1) * 2}px) / ${TABS.length})`;
+  ind.style.transform = `translateX(calc(${TABS.indexOf(tab)} * (100% + 2px)))`;
 
-  if (openChat && tab === 'chats') { tg.BackButton.show(); } else { tg.BackButton.hide(); }
+  if (inChat || inAdmin) { tg.BackButton.show(); } else { tg.BackButton.hide(); }
 }
 tg.BackButton.onClick(() => {
   if (closeViewer()) return;       // сначала закрываем открытое фото или видео
+  if (adminOpen && tab === 'me') { adminOpen = false; enterKind = 'pop'; return go('me', true); }
   openChat = null;
-  go('chats');
+  enterKind = 'pop';
+  go('chats', true);
 });
 
 function planBadge(plan) {
@@ -857,7 +926,7 @@ function showBanned(text) {
 
 // Выезжающая снизу панель с кнопками. buttons: [{ text, cls, run }]
 function sheet(title, hint, buttons) {
-  const close = () => shade.remove();
+  const close = () => { shade.classList.add('out'); setTimeout(() => shade.remove(), 180); };
   const shade = h('div', { class: 'shade', onclick: (e) => { if (e.target === shade) close(); } },
     h('div', { class: 'sheet' }, h('h3', {}, title), h('p', {}, hint),
       buttons.map((b) => h('button', { class: `btn ${b.cls || ''}`, onclick: () => { haptic('medium'); close(); b.run(); } }, b.text)),
@@ -865,12 +934,17 @@ function sheet(title, hint, buttons) {
   document.body.append(shade);
 }
 
-function go(name) {
+// keepKind — анимацию уже выбрали снаружи (например, «назад»); иначе обычная смена вкладки.
+function go(name, keepKind = false) {
   if (name !== tab) { openChat = name === 'chats' ? openChat : null; filter = 'all'; }
+  if (name !== 'me') adminOpen = false;
+  if (!keepKind) enterKind = 'fade';
+  const back = enterKind === 'pop' && name === 'chats' && !openChat;
   tab = name;
   chrome();
-  window.scrollTo(0, 0);
-  ({ chats: openChat ? showChat : showChats, feed: showFeed, stats: showStats, me: showMe, admin: showAdmin })[tab]();
+  ({ chats: openChat ? showChat : showChats, feed: showFeed, stats: showStats, me: adminOpen ? showAdmin : showMe, set: showMe })[tab]();
+  // Вернулись к списку чатов — возвращаем его на то место, где он был.
+  window.scrollTo(0, back ? listScroll : 0);
 }
 
 const view = () => $('view');
@@ -904,10 +978,9 @@ const segmented = (onPick) => h('div', { class: 'seg scroll' }, [['all', L.all],
 // Экран «Чаты»: список собеседников.
 // ============================================================================
 async function showChats() {
-  if (!chatsCache.length) loading();
-  let data;
-  try { data = await call('chats', { tz: -new Date().getTimezoneOffset() }); } catch { return failed(showChats); }
-  if (tab !== 'chats' || openChat) return;
+  await swr('chats', () => call('chats', { tz: -new Date().getTimezoneOffset() }), paintChats, () => tab === 'chats' && !openChat, showChats);
+}
+function paintChats(data) {
   remember(data);
   chatsCache = data.chats;
   const sum = (key) => data.chats.reduce((n, c) => n + c[key], 0);
@@ -921,7 +994,7 @@ async function showChats() {
   };
   const input = h('input', { type: 'search', placeholder: L.search, value: query, oninput: (e) => { query = e.target.value; draw(); } });
 
-  view().replaceChildren(h('div', { class: 'fade' },
+  view().replaceChildren(h('div', { class: enter() },
     banners(),
     h('div', { class: 'tiles' },
       h('div', { class: 'tile' }, h('b', {}, num(data.chats.length)), h('span', {}, L.people)),
@@ -939,7 +1012,7 @@ function chatRow(c) {
   const sub = fresh ? `✏️ ${L.renamed} · ${shortDate(c.renamedAt)}` : c.eventAt
     ? `${c.username ? `@${c.username} · ` : ''}${L.lastEvent} ${stamp(c.eventAt)}`
     : `${c.username ? `@${c.username} · ` : ''}${num(c.saved)} ${L.msgs}, ${L.noEvents}`;
-  return h('button', { class: 'row', onclick: () => { haptic(); openChat = c; filter = 'all'; go('chats'); } },
+  return h('button', { class: 'row', onclick: () => { haptic(); listScroll = window.scrollY; openChat = c; filter = 'all'; enterKind = 'push'; go('chats', true); } },
     avatar(c.name, c.chatId),
     h('div', { class: 'mid' },
       h('div', { class: 'name' }, h('span', {}, c.name || '?'), c.fav && '⭐', c.muted && h('i', { class: 'hint', html: icon('bellOff', 14) })),
@@ -971,6 +1044,7 @@ async function showChat() {
   paintMute();
 
   const namesBox = h('div', {});
+  const pinsBox = h('div', {});
   const favBtn = h('button', { class: 'btn' });
   const paintFav = () => favBtn.replaceChildren(c.fav ? '⭐' : h('i', { html: icon('star', 17) }), c.fav ? L.unfav : L.fav);
   favBtn.onclick = async () => {
@@ -992,7 +1066,7 @@ async function showChat() {
     };
   }
 
-  view().replaceChildren(h('div', { class: 'fade' },
+  view().replaceChildren(h('div', { class: enter() },
     h('div', { class: 'card hero' },
       avatar(c.name, c.chatId, 'big'),
       h('h2', {}, c.name || '?'),
@@ -1010,20 +1084,34 @@ async function showChat() {
       h('div', { class: 'kv' }, h('span', {}, L.first), h('b', {}, c.firstAt ? `${midDate(c.firstAt)}, ${clock(c.firstAt)}` : '—')),
       h('div', { class: 'kv' }, h('span', {}, L.last), h('b', {}, c.lastAt ? `${midDate(c.lastAt)}, ${clock(c.lastAt)}` : '—'))),
     namesBox,
+    pinsBox,
     segmented(showChat),
     listBox,
   ));
 
+  // Список событий: если эту страницу уже открывали — показываем сразу, свежие данные подгружаем следом.
+  const key = `chat:${c.chatId}:${filter}`;
+  const cached = memo.get(key);
+  if (cached) fillChat(cached.data);
   let data;
-  try { data = await call('feed', { type: filter, chatId: c.chatId }); } catch { return listBox.replaceChildren(h('div', { class: 'empty' }, L.error)); }
-  if (openChat !== c) return;
+  try { data = await call('feed', { type: filter, chatId: c.chatId }); } catch { if (!cached) listBox.replaceChildren(h('div', { class: 'empty' }, L.error)); return; }
+  const text = JSON.stringify(data);
+  memo.set(key, { data, text });
+  if (openChat !== c || (cached && cached.text === text)) return;
+  fillChat(data);
+
+  function fillChat(data) {
   remember(data);
   listBox.replaceChildren(...listOf(data.items, false));
+  // Закреплённые — отдельным блоком вверху, независимо от фильтра.
+  pinsBox.replaceChildren(...(data.pinned?.length ? [h('div', { class: 'pins' },
+    h('div', { class: 'section' }, `📌 ${L.pinnedTitle} · ${data.pinned.length}`), data.pinned.map((item) => eventCard(item, false)))] : []));
   // Прежние имена собеседника (если он их менял).
   if (data.names?.length) {
     namesBox.replaceChildren(h('div', { class: 'section', style: 'margin-top:8px' }, `✏️ ${L.namesTitle}`),
       h('div', { class: 'card', style: 'padding:3px 0' }, data.names.map((n) => h('div', { class: 'oldname' },
         h('b', {}, [n.name || '—', n.username && `@${n.username}`].filter(Boolean).join(' · ')), h('span', {}, fill(L.namesTill, { d: shortDate(n.at) }))))));
+  }
   }
 }
 
@@ -1042,13 +1130,18 @@ async function showFeed() {
   };
   async function fetchFeed() {
     const asked = feedQuery;
+    const key = `feed:${filter}:${asked}`;
+    const cached = memo.get(key);
+    const fillFeed = (data) => { remember(data); box.replaceChildren(...listOf(data.items, true, Boolean(asked))); };
+    if (cached) fillFeed(cached.data);
     let data;
-    try { data = await call('feed', { type: filter, q: asked }); } catch { return box.replaceChildren(h('div', { class: 'empty' }, L.error)); }
-    if (tab !== 'feed' || asked !== feedQuery) return;
-    remember(data);
-    box.replaceChildren(...listOf(data.items, true, Boolean(asked)));
+    try { data = await call('feed', { type: filter, q: asked }); } catch { if (!cached) box.replaceChildren(h('div', { class: 'empty' }, L.error)); return; }
+    const text = JSON.stringify(data);
+    memo.set(key, { data, text });
+    if (tab !== 'feed' || asked !== feedQuery || (cached && cached.text === text)) return;
+    fillFeed(data);
   }
-  view().replaceChildren(h('div', { class: 'fade' },
+  view().replaceChildren(h('div', { class: enter() },
     me && banners(), segmented(showFeed),
     h('div', { class: 'search' }, h('i', { html: icon('search', 18) }), input),
     box));
@@ -1147,6 +1240,24 @@ function textBlock(content, long) {
 }
 const isLong = (text) => text.length > 420 || text.split('\n').length > 9;
 
+// Булавка: закрепляет сообщение вверху страницы собеседника (и оно тоже не стирается по сроку).
+function stickButton(item) {
+  const btn = h('button', { class: `pinbtn${item.pinned ? ' on' : ''}` }, '📌');
+  btn.onclick = async () => {
+    haptic('medium');
+    const next = !item.pinned;
+    try {
+      await call('settings', { stick: { id: item.id, on: next } });
+      item.pinned = next;
+      btn.classList.toggle('on', next);
+      toast(next ? L.stuck : L.unstuck);
+      forget('chat:'); forget('feed:');
+      if (openChat && tab === 'chats') showChat(); // блок «Закреплённые» вверху страницы обновляется сразу
+    } catch (err) { tg.showAlert(err.message || L.error); }
+  };
+  return btn;
+}
+
 // Звёздочка-закладка: сообщение с ней не стирается по сроку хранения.
 function keepButton(item) {
   const btn = h('button', { class: `star${item.kept ? ' on' : ''}` }, item.kept ? '★' : '☆');
@@ -1175,7 +1286,7 @@ function eventCard(item, withName) {
     item.deletedAt && h('span', { class: 'tag red' }, `🗑 ${L.tagDeleted}`),
     item.editedAt && h('span', { class: 'tag amber' }, `✏️ ${L.tagEdited}`),
     h('time', { style: withName ? '' : 'margin-left:auto' }, clock(item.at)),
-    keepButton(item)));
+    stickButton(item), keepButton(item)));
 
   if (item.kind !== 'text') card.append(h('div', { class: 'kindline' }, kindLabel(item.kind, meta)));
 
@@ -1469,10 +1580,9 @@ function bars(values, colors, labels) {
 }
 
 async function showStats() {
-  loading(4);
-  let data;
-  try { data = await call('stats', { tz: -new Date().getTimezoneOffset() }); } catch { return failed(showStats); }
-  if (tab !== 'stats') return;
+  await swr('stats', () => call('stats', { tz: -new Date().getTimezoneOffset() }), paintStats, () => tab === 'stats', showStats, 4);
+}
+function paintStats(data) {
   remember(data);
   const t = data.totals;
   const share = t.saved ? Math.round((t.deleted / t.saved) * 100) : 0;
@@ -1481,7 +1591,7 @@ async function showStats() {
   const topMax = Math.max(1, ...data.top.map((c) => c.deleted + c.edited));
   const hasEvents = t.deleted + t.edited > 0;
 
-  view().replaceChildren(h('div', { class: 'fade' },
+  view().replaceChildren(h('div', { class: enter() },
     h('div', { class: 'tiles two' },
       h('div', { class: 'tile' }, h('b', {}, num(t.chats)), h('span', {}, L.people)),
       h('div', { class: 'tile violet' }, h('b', {}, num(t.saved)), h('span', {}, L.saved)),
@@ -1518,10 +1628,25 @@ async function showStats() {
 // ============================================================================
 // Экран «Профиль»: тариф и настройки.
 // ============================================================================
+// Одна функция рисует обе вкладки: «Аккаунт» (tab = 'me') и «Настройки» (tab = 'set').
 async function showMe() {
   if (!me) { loading(3); try { remember(await call('chats')); } catch { return failed(showMe); } }
-  if (tab !== 'me') return;
-  const save = async (input) => { try { remember(await call('settings', input)); } catch { toast(L.error); } showMe(); };
+  if (tab !== 'me' && tab !== 'set') return;
+  // Переключатели срабатывают мгновенно: сначала меняем на экране, потом сообщаем серверу (и откатываем, если не вышло).
+  const save = async (input) => {
+    const before = { ...me };
+    for (const key of ['notify', 'favOnly', 'weekly', 'alertClear']) if (key in input) me[key] = input[key];
+    if (input.lang && TEXTS[input.lang]) { me.lang = input.lang; lang = input.lang; L = TEXTS[lang]; chrome(); }
+    showMe();
+    try {
+      remember(await call('settings', input));
+      if (input.wipe) { memo.clear(); showMe(); }
+    } catch {
+      me = before; lang = before.lang; L = TEXTS[lang] || L; chrome();
+      toast(L.error);
+      showMe();
+    }
+  };
   const perks = (n) => h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n, d: me.proDays }))));
 
   async function buy(btn, plan = 'month') {
@@ -1629,14 +1754,52 @@ async function showMe() {
   const link = me.bot ? `https://t.me/${me.bot}?start=ref_${me.id}` : '';
   const copy = async () => { try { await navigator.clipboard.writeText(link); toast(L.copied); } catch { tg.showAlert(link); } };
 
-  view().replaceChildren(h('div', { class: 'fade' },
+  const toggle = (iconName, color, title, hint, on, input) => h('button', { class: 'opt', onclick: () => { haptic('medium'); save(input); } },
+    h('div', { class: `ic ${color}`, html: icon(iconName, 18) }),
+    h('div', { class: 'mid' }, h('div', {}, title), h('small', {}, hint)),
+    h('div', { class: `switch${on ? ' on' : ''}` }));
+  const linkRow = (iconName, color, title, hint, run) => h('button', { class: 'opt', onclick: run },
+    h('div', { class: `ic ${color}`, html: icon(iconName, 18) }),
+    h('div', { class: 'mid' }, h('div', {}, title), h('small', {}, hint)),
+    h('i', { class: 'chev', html: icon('chev', 18) }));
+
+  // ---------- вкладка «Настройки» ----------
+  if (tab === 'set') {
+    view().replaceChildren(h('div', { class: enter() },
+      h('div', { class: 'section', style: 'margin-top:4px' }, L.modesTitle),
+      h('div', { class: 'card' }, modes,
+        me.notify !== 0 && toggle('star', 'amber', L.favOnly, L.favOnlyHint, me.favOnly, { favOnly: !me.favOnly })),
+      h('div', { class: 'section' }, L.secAlerts),
+      h('div', { class: 'card' },
+        toggle('bell', 'red', L.alertClear, fill(L.alertClearHint, { n: me.clearAlert }), me.alertClear, { alertClear: !me.alertClear }),
+        toggle('report', 'amber', L.weekly, L.weeklyHint, me.weekly, { weekly: !me.weekly })),
+      h('div', { class: 'section' }, L.secLook),
+      h('div', { class: 'seg' }, ['system', 'light', 'dark'].map((key, i) => h('button', {
+        class: key === theme ? 'on' : '', onclick: () => { haptic(); applyTheme(key, true); showMe(); },
+      }, L.themes[i]))),
+      h('div', { class: 'card' },
+        h('div', { class: 'opt' },
+          h('div', { class: 'ic violet', html: icon('globe', 18) }),
+          h('div', { class: 'mid' }, h('div', {}, L.lang)),
+          h('div', { class: 'langs' }, [['ru', 'RU'], ['uz', 'UZ'], ['en', 'EN']].map(([code, label]) => h('button', {
+            class: code === lang ? 'on' : '', onclick: () => { haptic(); if (code !== lang) save({ lang: code }); },
+          }, label)))),
+        canHome && linkRow('home', 'violet', L.home, L.homeHint, () => { haptic(); try { tg.addToHomeScreen(); toast(L.homeDone); } catch { toast(L.error); } })),
+      h('div', { class: 'section' }, L.secSafe),
+      h('div', { class: 'card' },
+        linkRow('lock', me.hasPin ? 'green' : '', L.pinTitle, me.hasPin ? L.pinOn : L.pinOff, pinRow),
+        linkRow('safe', me.vault ? 'green' : 'violet', L.vault, me.vault ? fill(L.vaultOnHint, { t: me.vault }) : L.vaultOffHint, vaultRow)),
+      h('p', { class: 'hint', style: 'margin:12px 6px; text-align:center' }, L.privacy),
+    ));
+    return;
+  }
+
+  // ---------- вкладка «Аккаунт» ----------
+  view().replaceChildren(h('div', { class: enter() },
     plan,
-    h('div', { class: 'section' }, L.modesTitle),
-    h('div', { class: 'card' }, modes,
-      me.notify !== 0 && h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ favOnly: !me.favOnly }); } },
-        h('div', { class: 'ic amber', html: icon('star', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.favOnly), h('small', {}, L.favOnlyHint)),
-        h('div', { class: `switch${me.favOnly ? ' on' : ''}` }))),
+    me.admin && h('div', { class: 'card' }, linkRow('admin', 'violet', L.adminOpen, L.adminOpenHint, () => { haptic(); adminOpen = true; enterKind = 'push'; go('me', true); })),
+    h('div', { class: 'section' }, L.promo),
+    h('div', { class: 'card pad' }, h('div', { class: 'inline' }, promoInput, h('button', { class: 'btn primary', onclick: applyPromo }, L.apply))),
     link && [
       h('div', { class: 'section' }, L.refTitle),
       h('div', { class: 'card pad' },
@@ -1652,54 +1815,19 @@ async function showMe() {
     h('div', { class: 'section' }, L.gift),
     h('div', { class: 'card pad' }, h('div', { class: 'inline' }, giftInput, h('button', { class: 'btn primary', onclick: sendGift }, L.giftBtn)),
       h('div', { class: 'hint', style: 'margin-top:8px' }, fill(L.giftHint, { d: me.giftDays, stars: me.stars }))),
-    h('div', { class: 'section' }, L.promo),
-    h('div', { class: 'card pad' }, h('div', { class: 'inline' }, promoInput, h('button', { class: 'btn primary', onclick: applyPromo }, L.apply))),
-    h('div', { class: 'section' }, L.theme),
-    h('div', { class: 'seg' }, ['system', 'light', 'dark'].map((key, i) => h('button', {
-      class: key === theme ? 'on' : '', onclick: () => { haptic(); applyTheme(key, true); showMe(); },
-    }, L.themes[i]))),
-    h('div', { class: 'section' }, L.tabs.me),
+    h('div', { class: 'section' }, L.secStatus),
     h('div', { class: 'card' },
-      h('div', { class: 'opt' },
-        h('div', { class: 'ic violet', html: icon('globe', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.lang)),
-        h('div', { class: 'langs' }, [['ru', 'RU'], ['uz', 'UZ'], ['en', 'EN']].map(([code, label]) => h('button', {
-          class: code === lang ? 'on' : '', onclick: () => { haptic(); if (code !== lang) save({ lang: code }); },
-        }, label)))),
       h('div', { class: 'opt' },
         h('div', { class: `ic ${me.connected ? 'green' : 'red'}`, html: icon('link', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.connection), h('small', {}, me.connected ? L.connected : L.notConnected))),
-      h('button', { class: 'opt', onclick: pinRow },
-        h('div', { class: `ic ${me.hasPin ? 'green' : ''}`, html: icon('lock', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.pinTitle), h('small', {}, me.hasPin ? L.pinOn : L.pinOff)),
-        h('i', { class: 'chev', html: icon('chev', 18) })),
-      h('button', { class: 'opt', onclick: vaultRow },
-        h('div', { class: `ic ${me.vault ? 'green' : 'violet'}`, html: icon('safe', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.vault), h('small', {}, me.vault ? fill(L.vaultOnHint, { t: me.vault }) : L.vaultOffHint)),
-        h('i', { class: 'chev', html: icon('chev', 18) })),
-      h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ alertClear: !me.alertClear }); } },
-        h('div', { class: 'ic red', html: icon('bell', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.alertClear), h('small', {}, fill(L.alertClearHint, { n: me.clearAlert }))),
-        h('div', { class: `switch${me.alertClear ? ' on' : ''}` })),
-      h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ weekly: !me.weekly }); } },
-        h('div', { class: 'ic amber', html: icon('report', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.weekly), h('small', {}, L.weeklyHint)),
-        h('div', { class: `switch${me.weekly ? ' on' : ''}` }))),
+        h('div', { class: 'mid' }, h('div', {}, L.connection), h('small', {}, me.connected ? L.connected : L.notConnected)))),
     !me.connected && [h('div', { class: 'section' }, L.how), h('div', { class: 'card' }, h('ol', { class: 'steps' }, L.steps.map((s) => h('li', {}, s))))],
+    h('div', { class: 'section' }, L.secData),
     h('div', { class: 'card' },
-      h('button', { class: 'opt', onclick: exportAll },
-        h('div', { class: 'ic', html: icon('download', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.exportAll), h('small', {}, L.exportAllHint)),
-        h('i', { class: 'chev', html: icon('chev', 18) })),
-      canHome && h('button', { class: 'opt', onclick: () => { haptic(); try { tg.addToHomeScreen(); toast(L.homeDone); } catch { toast(L.error); } } },
-        h('div', { class: 'ic violet', html: icon('home', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.home), h('small', {}, L.homeHint)),
-        h('i', { class: 'chev', html: icon('chev', 18) }))),
-    h('div', { class: 'card' },
+      linkRow('download', '', L.exportAll, L.exportAllHint, exportAll),
       h('button', { class: 'opt', onclick: () => tg.showConfirm(L.wipeAsk, (ok) => { if (ok) { chatsCache = []; save({ wipe: true }).then(() => toast(L.wiped)); } }) },
         h('div', { class: 'ic red', html: icon('trash', 18) }),
         h('div', { class: 'mid' }, h('div', { style: 'color:var(--red)' }, L.wipe), h('small', {}, L.wipeHint)))),
-    h('p', { class: 'hint', style: 'margin:12px 6px; text-align:center' }, L.privacy),
+    h('p', { class: 'hint', style: 'margin:12px 6px; text-align:center' }, `ID ${me.id}`),
   ));
 }
 
@@ -1708,10 +1836,15 @@ async function showMe() {
 // ============================================================================
 let adminQuery = '';
 async function showAdmin(input = {}) {
-  if (!input.action) loading(4);
+  const alive = () => tab === 'me' && adminOpen;
+  if (!input.action) return swr('admin', () => call('admin'), paintAdmin, alive, () => showAdmin(), 4);
+  // Действие (выдать Pro, заблокировать…): выполняем и перерисовываем с ответом сервера.
   let data;
-  try { data = await call('admin', input); } catch { toast(L.error); return input.action ? showAdmin() : failed(() => showAdmin()); }
-  if (tab !== 'admin') return;
+  try { data = await call('admin', input); } catch { toast(L.error); return; }
+  memo.set('admin', { data, text: JSON.stringify(data) });
+  if (alive()) paintAdmin(data);
+}
+function paintAdmin(data) {
   remember(data);
   const t = data.totals;
   const act = async (payload) => { await showAdmin(payload); toast(L.aDone); };
@@ -1814,7 +1947,7 @@ async function showAdmin(input = {}) {
     h('div', {}, h('span', {}, label), h('b', {}, `${num(n)} · ${t.started ? Math.round((n / t.started) * 100) : 0}%`)),
     h('div', { class: 'track' }, h('div', { class: 'fill', style: `width:${t.started ? Math.min(100, (n / t.started) * 100) : 0}%` })));
 
-  view().replaceChildren(h('div', { class: 'fade' },
+  view().replaceChildren(h('div', { class: enter() },
     h('div', { class: 'tiles two' },
       h('div', { class: 'tile' }, h('b', {}, num(t.users)), h('span', {}, L.aUsers)),
       h('div', { class: 'tile green' }, h('b', {}, num(t.conns)), h('span', {}, L.aConn)),

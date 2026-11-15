@@ -515,6 +515,39 @@ await step('Закладки: не стираются по сроку, есть 
   sqlite.prepare("delete from messages where text like 'закл%'").run();
 });
 
+await step('Закрепление: сообщение вверху страницы собеседника, не стирается по сроку, есть предел', async () => {
+  const ids = [];
+  for (let i = 0; i <= LIMITS.pinsPerChat; i++) { const m = biz({ text: `закреп ${i}` }); ids.push(m.message_id); await onBizMessage(m); }
+  await del(ids);
+  take();
+  givePro(OWNER);                                                                                    // чтобы в ленте поместились все записи
+  const mine = (await feedEndpoint({ type: 'deleted', chatId: FRIEND, q: 'закреп' }, ctx(OWNER))).items;
+  assert.equal(mine.length, LIMITS.pinsPerChat + 1);
+  const [first, second] = mine;
+  await settingsEndpoint({ stick: { id: second.id, on: true } }, ctx(OWNER));
+  sqlite.prepare('update messages set pinned = pinned - 10 where id = ?').run(second.id);              // закреплено чуть раньше
+  await settingsEndpoint({ stick: { id: first.id, on: true } }, ctx(OWNER));
+  // Закреплённые приходят отдельным списком, независимо от фильтра и поиска; последнее закреплённое — первым.
+  const page = await feedEndpoint({ type: 'edited', chatId: FRIEND, q: 'ничего такого нет' }, ctx(OWNER));
+  assert.deepEqual(page.pinned.map((i) => [i.id, i.pinned]), [[first.id, true], [second.id, true]]);
+  assert.equal(page.items.length, 0);
+  assert.equal((await feedEndpoint({ type: 'all' }, ctx(OWNER))).pinned.length, 0);                    // в общей ленте списка нет
+  assert.equal((await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OTHER))).pinned.length, 0);    // чужие не видны
+  await assert.rejects(() => settingsEndpoint({ stick: { id: first.id, on: true } }, ctx(OTHER)));     // и чужое не закрепить
+  // Закреплённое переживает уборку.
+  sqlite.prepare('update messages set date = ? where id = ?').run(now() - (LIMITS.proDays + 5) * 86400, first.id);
+  await onBizMessage({ ...biz({ text: 'закреп уборка' }), message_id: 7000 });
+  assert.ok(sqlite.prepare('select id from messages where id = ?').get(first.id));
+  // Предел на одного собеседника.
+  for (const item of mine.slice(2, LIMITS.pinsPerChat)) await settingsEndpoint({ stick: { id: item.id, on: true } }, ctx(OWNER));
+  await assert.rejects(() => settingsEndpoint({ stick: { id: mine.at(-1).id, on: true } }, ctx(OWNER)), /открепите/);
+  await settingsEndpoint({ stick: { id: first.id, on: false } }, ctx(OWNER));
+  await settingsEndpoint({ stick: { id: mine.at(-1).id, on: true } }, ctx(OWNER));
+  assert.equal((await feedEndpoint({ type: 'all', chatId: FRIEND }, ctx(OWNER))).pinned.length, LIMITS.pinsPerChat);
+  sqlite.prepare("delete from messages where text like 'закреп%'").run();
+  givePro(OWNER, 0);
+});
+
 await step('PIN-код: без него приложение ничего не отдаёт; пауза после неверных попыток; сброс стирает данные', async () => {
   const USER = 40; // у него есть подключение из сценария с приглашением
   const withPin = (pin) => chatsEndpoint({ pin }, ctx(USER));

@@ -212,6 +212,38 @@ export async function setKept(user, id, on) {
   return true;
 }
 
+// ---------- закрепление ----------
+
+// Закрепляет сообщение вверху страницы собеседника (или открепляет). Закреплённое не стирается по сроку хранения.
+// null — сообщение не найдено, false — у этого собеседника уже закреплено слишком много.
+export async function setPinned(user, id, on) {
+  const row = await getOwnMessage(user.id, id);
+  if (!row) return null;
+  if (on && !row.pinned) {
+    const have = await db.$count(messages, and(eq(messages.ownerId, user.id), eq(messages.chatId, row.chatId), gt(messages.pinned, 0)));
+    if (have >= LIMITS.pinsPerChat) return false;
+  }
+  await db.update(messages).set({ pinned: on ? now() : 0 }).where(eq(messages.id, row.id)).run();
+  return true;
+}
+
+// Закреплённые сообщения собеседника: сначала те, что закрепили последними.
+export async function pinnedOf(ownerId, chatId) {
+  const rows = await db.select().from(messages)
+    .where(and(eq(messages.ownerId, ownerId), eq(messages.chatId, chatId), gt(messages.pinned, 0)))
+    .orderBy(desc(messages.pinned)).limit(LIMITS.pinsPerChat).all();
+  const changed = rows.filter((r) => r.editedAt).map((r) => r.id);
+  const history = changed.length
+    ? await db.select().from(edits).where(inArray(edits.msgId, changed)).orderBy(asc(edits.id)).all()
+    : [];
+  return rows.map((r) => ({
+    ...r,
+    at: Math.max(r.deletedAt ?? 0, r.editedAt ?? 0) || r.date,
+    versions: history.filter((e) => e.msgId === r.id)
+      .map((e) => ({ id: e.id, text: e.oldText, at: e.at, kind: e.oldKind ?? r.kind, hasFile: Boolean(e.oldFileId) })),
+  }));
+}
+
 // ---------- отчёт за неделю ----------
 
 // Номер недели (недели начинаются в понедельник по местному времени пользователя).
@@ -623,8 +655,8 @@ export async function cleanup() {
   const t = now();
   const proCut = t - LIMITS.proDays * DAY;
   const freeCut = t - LIMITS.freeDays * DAY;
-  // Закладки (kept = 1) не стираем.
-  const old = sql`kept = 0 and (date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t} or vip = 1)))`;
+  // Закладки (kept = 1) и закреплённые (pinned > 0) не стираем.
+  const old = sql`kept = 0 and pinned = 0 and (date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t} or vip = 1)))`;
   await db.run(sql`delete from edits where msg_id in (select id from messages where ${old})`);
   await db.run(sql`delete from edits where msg_id not in (select id from messages)`);
   await db.run(sql`delete from messages where ${old}`);
