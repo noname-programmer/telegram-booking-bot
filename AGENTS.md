@@ -186,10 +186,14 @@ The platform manages the bot's webhook for you, derived from your deployed
 - It has no standalone runtime and no example configs. Its scenarios are `test/keeper.js` (`cd test && npm run keeper`,
   also part of `npm test`); the test builds tables straight from `keeper/tgcloud/schema.js`.
 - All texts live in `keeper/tgcloud/lib/i18n.js` in three languages (ru, uz, en); a test fails if a key is missing in one.
-- Mini App endpoints: `chats`, `feed`, `stats`, `settings`, `sendMedia`, `admin`. Each starts with `whoami(ctx)` from
+- Mini App endpoints: `chats`, `feed`, `stats`, `settings`, `media`, `sendMedia`, `invoice`, `export`, `admin`. Each starts with `whoami(ctx)` from
   `lib/app.js`; `admin` must call `requireAdmin` and must never return message text. The Mini App is one hand-written file,
   `keeper/miniapp/index.html` (three languages inside, all user text inserted as text, never as HTML).
-- A user can turn notifications off (`users.notify`) or mute one chat (`chats.muted`): handlers still save and count
-  everything, they only skip the message to the owner.
+- Notifications go through `announce()` in `lib/ui.js`. `users.notify` is a mode from `NOTIFY` in `lib/config.js`
+  (0 quiet — the default for new users, 1 full, 2 short, 3 one message a day); `chats.muted`, `chats.fav` and
+  `users.favOnly` narrow it. Handlers always save and count; `announce()` only decides whether to message the owner.
+- Pro = paid or trial (`users.proUntil`) or VIP (`users.vip`); always check with `isPro(user)`. `OWNER_ID` gets VIP
+  automatically in `getUser`. Only admins may grant VIP (`/vip`, `admin` endpoint).
+- The schema default of `users.notify` is still 1 (the platform cannot change a column default); `getUser` writes 0.
 - It never stores the owner's own messages or protected content, and has no code to capture self-destructing media.
   Keep it that way.

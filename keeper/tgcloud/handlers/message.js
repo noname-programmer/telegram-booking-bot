@@ -4,7 +4,7 @@
 import { api } from 'sdk';
 import { ADMIN_IDS, PRO } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
-import { getUser, grantPro, now, stats } from '../lib/store.js';
+import { getUser, grantPro, now, stats, setReferrer, adminSetVip } from '../lib/store.js';
 import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate } from '../lib/ui.js';
 
 export default async function onMessage(message) {
@@ -28,6 +28,20 @@ export default async function onMessage(message) {
   if (command === '/lang') return send(chatId, t(lang, 'chooseLang'), { reply_markup: langKeyboard() });
   if (command === '/privacy') return send(chatId, ...split(privacyScreen(lang)));
   if (command === '/stats' && ADMIN_IDS.includes(user.id)) return send(chatId, t(lang, 'stats', await stats()));
+
+  // /vip 123456 и /unvip 123456 — выдать или снять бессрочный VIP (только для владельца).
+  if ((command === '/vip' || command === '/unvip') && ADMIN_IDS.includes(user.id)) {
+    const id = Number((message.text ?? '').split(/\s+/)[1]);
+    if (!Number.isSafeInteger(id) || id <= 0) return send(chatId, t(lang, 'vipUsage'));
+    const on = command === '/vip';
+    const target = await adminSetVip(id, on);
+    if (on) await send(id, t(target.lang, 'vipGiven'));
+    return send(chatId, t(lang, on ? 'vipOn' : 'vipOff', { id }));
+  }
+
+  // Пришёл по приглашению: /start ref_<ID друга>.
+  const ref = /^\/start(?:@\w+)?\s+ref_(\d+)$/.exec(message.text ?? '');
+  if (ref) await setReferrer(user, Number(ref[1]));
 
   // /start, /help и любой другой текст — главное меню.
   const me = await api.getMe();

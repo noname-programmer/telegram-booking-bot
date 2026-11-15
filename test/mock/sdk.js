@@ -12,7 +12,9 @@ export class BotApiError extends Error {
   }
 }
 export class EndpointError extends Error {}
-export class InputFile {}
+export class InputFile {
+  constructor(bytes, name, options) { Object.assign(this, { bytes, name, options }); }
+}
 export const fetch = () => { throw new Error('fetch не нужен в тестах'); };
 
 export const calls = [];
@@ -25,6 +27,7 @@ export const api = new Proxy({}, {
     calls.push({ method, params });
     const err = failures.rule?.(method, params);
     if (err) throw err;
+    if (method === 'getFileContent') return new Uint8Array([72, 105, 33]); // байты «Hi!»
     if (method === 'sendMessage') return { message_id: nextMessageId++, chat: { id: params.chat_id } };
     return true;
   },

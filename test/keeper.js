@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import * as schema from '../keeper/tgcloud/schema.js';
 import { sqlite, calls, failures, BotApiError } from 'sdk';
-import { LIMITS, PRO, ADMIN_IDS } from '../keeper/tgcloud/lib/config.js';
+import { LIMITS, PRO, ADMIN_IDS, OWNER_ID, NOTIFY, REF } from '../keeper/tgcloud/lib/config.js';
 import { KEYS, LANGS, hasKey, pickLang } from '../keeper/tgcloud/lib/i18n.js';
 import onMessage from '../keeper/tgcloud/handlers/message.js';
 import onCallback from '../keeper/tgcloud/handlers/callback_query.js';
@@ -22,6 +22,10 @@ import chatsEndpoint from '../keeper/tgcloud/endpoints/chats.js';
 import statsEndpoint from '../keeper/tgcloud/endpoints/stats.js';
 import settingsEndpoint from '../keeper/tgcloud/endpoints/settings.js';
 import adminEndpoint from '../keeper/tgcloud/endpoints/admin.js';
+import mediaEndpoint from '../keeper/tgcloud/endpoints/media.js';
+import invoiceEndpoint from '../keeper/tgcloud/endpoints/invoice.js';
+import exportEndpoint from '../keeper/tgcloud/endpoints/export.js';
+import { base64, utf8 } from '../keeper/tgcloud/lib/app.js';
 
 // Создаём таблицы прямо из keeper/tgcloud/schema.js (на платформе это делает `npx tgcloud migrate`).
 for (const t of Object.values(schema)) {
@@ -62,6 +66,8 @@ const texts = (list) => sent(list).map((c) => c.params.text).join('\n---\n');
 const ctx = (id) => ({ initData: { user: tgUser(id) } });
 const count = (table) => sqlite.prepare(`select count(*) as n from ${table}`).get().n;
 const givePro = (id, until = now() + 1000) => sqlite.prepare('update users set pro_until = ? where id = ?').run(until, id);
+const userRow = (id) => sqlite.prepare('select * from users where id = ?').get(id);
+const setMode = (id, mode) => sqlite.prepare('update users set notify = ? where id = ?').run(mode, id);
 
 let passed = 0;
 let failed = 0;
@@ -90,9 +96,23 @@ await step('/start → меню на языке пользователя, бот
   await msg(OWNER, { text: '/start' });
   const out = take();
   assert.match(texts(out), /Бот пока не подключён/);
-  assert.match(texts(out), /бесплатный/);
   await msg(OTHER, { text: '/start' }, 'uz');
   assert.match(texts(take()), /ulanmagan/);
+});
+
+await step('Новый пользователь: пробный Pro один раз и тихий режим по умолчанию', async () => {
+  const u = userRow(OWNER);
+  assert.equal(u.trial, 1);
+  assert.ok(Math.abs(u.pro_until - (now() + PRO.trialDays * 86400)) < 5);
+  assert.equal(u.notify, NOTIFY.off);
+  await msg(OWNER, { text: '/start' });
+  assert.match(texts(take()), /Pro активен/);
+  assert.match(texts(take()), /^$/);
+  givePro(OWNER, 0);                      // пробный срок «закончился»
+  await msg(OWNER, { text: '/start' });   // второй раз пробный не выдаётся
+  assert.match(texts(take()), /бесплатный/);
+  // Дальше старые сценарии проверяют полные уведомления — включаем этот режим.
+  setMode(OWNER, NOTIFY.full);
 });
 
 await step('Сообщения из групп игнорируются', async () => {
@@ -232,10 +252,10 @@ await step('Тихий режим и «без уведомлений» по ча
     await del([m.message_id]);
     return m;
   };
-  assert.equal((await settingsEndpoint({ notify: false }, ctx(OWNER))).notify, false);
+  assert.equal((await settingsEndpoint({ notify: NOTIFY.off }, ctx(OWNER))).notify, NOTIFY.off);
   await quiet('тихо');
   assert.equal(take().length, 0);
-  await settingsEndpoint({ notify: true }, ctx(OWNER));
+  await settingsEndpoint({ notify: NOTIFY.full }, ctx(OWNER));
   await settingsEndpoint({ mute: { chatId: FRIEND, muted: true } }, ctx(OWNER));
   const m = await quiet('без звука');
   assert.equal(take().length, 0);
@@ -249,10 +269,66 @@ await step('Тихий режим и «без уведомлений» по ча
 });
 
 await step('Кнопка «Уведомления» в меню бота переключает режим', async () => {
+  setMode(OWNER, NOTIFY.off);
+  const seen = [];
+  for (let i = 0; i < 4; i++) {
+    await press(OWNER, 'notify');
+    take();
+    seen.push(userRow(OWNER).notify);
+  }
+  assert.deepEqual(seen, [NOTIFY.short, NOTIFY.digest, NOTIFY.full, NOTIFY.off]); // по кругу
   await press(OWNER, 'notify');
-  assert.match(texts(take()), /Тихий режим/);
-  await press(OWNER, 'notify');
-  assert.match(texts(take()), /Уведомления приходят/);
+  assert.match(texts(take()), /одна строка/);
+  setMode(OWNER, NOTIFY.full);
+});
+
+await step('Короткий режим: одна строка с кнопкой «Открыть», без текста сообщения', async () => {
+  setMode(OWNER, NOTIFY.short);
+  const m = biz({ text: 'секретный текст' });
+  await onBizMessage(m);
+  await onBizEdited({ ...m, text: 'секретный текст 2' });
+  await del([m.message_id]);
+  const out = sent(take());
+  assert.equal(out.length, 2);
+  assert.doesNotMatch(texts(out), /секретный/);
+  assert.match(out[1].params.text, /Friend<\/b> удалил/);
+  sqlite.prepare("delete from edits where msg_id in (select id from messages where text like 'секретный%')").run();
+  sqlite.prepare("delete from messages where text like 'секретный%'").run();
+  setMode(OWNER, NOTIFY.full);
+});
+
+await step('Сводка: одно сообщение при первом событии дня, остальное молча', async () => {
+  setMode(OWNER, NOTIFY.digest);
+  sqlite.prepare('update users set digest_day = 0, digest_del = 4, digest_ed = 2 where id = ?').run(OWNER);
+  const ids = [];
+  for (const text of ['сводка 1', 'сводка 2', 'сводка 3']) { const m = biz({ text }); ids.push(m.message_id); await onBizMessage(m); }
+  await del([ids[0]]);
+  const first = sent(take());
+  assert.equal(first.length, 1);
+  assert.match(first[0].params.text, /Первое событие за сегодня/);
+  assert.match(first[0].params.text, /удалено 4, изменено 2/); // итог прошлого дня
+  await del([ids[1], ids[2]]);
+  assert.equal(take().length, 0);
+  assert.equal(userRow(OWNER).digest_del, 3);
+  sqlite.prepare("delete from messages where text like 'сводка%'").run();
+  setMode(OWNER, NOTIFY.full);
+});
+
+await step('Только избранные: уведомление приходит лишь о собеседнике со звёздочкой', async () => {
+  const once = async (text) => { const m = biz({ text }); await onBizMessage(m); await del([m.message_id]); return sent(take()).length; };
+  assert.equal((await settingsEndpoint({ favOnly: true }, ctx(OWNER))).favOnly, true);
+  assert.equal(await once('не избранный'), 0);
+  await settingsEndpoint({ fav: { chatId: FRIEND, fav: true } }, ctx(OWNER));
+  assert.equal((await chatsEndpoint({}, ctx(OWNER))).chats[0].fav, true);
+  assert.equal(await once('избранный'), 1);
+  await settingsEndpoint({ favOnly: false, fav: { chatId: FRIEND, fav: false } }, ctx(OWNER));
+  sqlite.prepare("delete from messages where text in ('не избранный', 'избранный')").run();
+});
+
+await step('Поиск по тексту в ленте', async () => {
+  const hit = await feedEndpoint({ type: 'all', q: 'МЕНЯ' }, ctx(OWNER));
+  assert.ok(hit.items.length >= 1 && hit.items.every((i) => /меня/i.test(i.text)));
+  assert.equal((await feedEndpoint({ type: 'all', q: 'такого нет %' }, ctx(OWNER))).items.length, 0);
 });
 
 await step('Аналитика: итоги, дни, часы, виды, скорость удаления', async () => {
@@ -278,12 +354,78 @@ await step('Админ-панель: только для админа, без т
   assert.equal(owner.connected, true);
   assert.ok(owner.chats === 1 && owner.deleted >= 2);
   assert.doesNotMatch(JSON.stringify(data), /приду в|смотри|удали/);
+  assert.ok(data.totals.started >= 3 && data.totals.everConnected === 1 && data.totals.paid === 0); // воронка
   const gift = await adminEndpoint({ action: 'pro', userId: OTHER, days: 30 }, admin);
   assert.equal(gift.users.find((u) => u.id === OTHER).pro, true);
   const off = await adminEndpoint({ action: 'pro', userId: OTHER, days: 0 }, admin);
   assert.equal(off.users.find((u) => u.id === OTHER).pro, false);
   await assert.rejects(() => adminEndpoint({ action: 'pro', userId: 424242, days: 30 }, admin));
   await assert.rejects(() => adminEndpoint({ action: 'pro', userId: OTHER, days: 30 }, ctx(OTHER)));
+});
+
+await step('Владелец: бессрочный VIP; может выдать и снять VIP командой и из админ-панели', async () => {
+  const admin = ctx(OWNER_ID);
+  const me = await chatsEndpoint({}, admin);
+  assert.equal(me.plan, 'owner');
+  assert.equal(me.pro, true);
+  await msg(OWNER_ID, { text: '/start' });
+  assert.match(texts(take()), /Владелец · VIP бессрочно/);
+  givePro(OTHER, 0);
+  await msg(OWNER_ID, { text: `/vip ${OTHER}` });
+  const out = sent(take());
+  assert.ok(out.some((c) => c.params.chat_id === OTHER && /VIP/.test(c.params.text))); // человеку пришло сообщение
+  assert.equal((await chatsEndpoint({}, ctx(OTHER))).plan, 'vip');
+  await assert.rejects(() => invoiceEndpoint({}, ctx(OTHER)));                          // VIP платить не нужно
+  await msg(OWNER_ID, { text: `/unvip ${OTHER}` });
+  assert.equal((await chatsEndpoint({}, ctx(OTHER))).plan, 'free');
+  await msg(OWNER, { text: `/vip ${OWNER}` });                                          // не владелец — команда не работает
+  assert.equal(userRow(OWNER).vip, 0);
+  take();
+  // Из админ-панели, в том числе человеку, который ещё не запускал бота.
+  const data = await adminEndpoint({ action: 'vip', userId: 777001, on: true }, admin);
+  assert.equal(data.users.find((u) => u.id === 777001).vip, true);
+  take();
+  await msg(777001, { text: '/start' });
+  assert.match(texts(take()), /VIP бессрочно/);
+  await adminEndpoint({ action: 'vip', userId: OWNER_ID, on: false }, admin);           // с владельца VIP не снять
+  assert.equal(userRow(OWNER_ID).vip, 1);
+  await assert.rejects(() => adminEndpoint({ action: 'vip', userId: OWNER, on: true }, ctx(OWNER)));
+  take();
+});
+
+await step('Приглашение: друг подключил бота → пригласивший получает дни Pro один раз', async () => {
+  const NEWBIE = 40;
+  await msg(NEWBIE, { text: `/start ref_${OTHER}` });
+  await msg(NEWBIE, { text: '/start ref_999' }); // второй раз пригласившего не сменить
+  take();
+  assert.equal(userRow(NEWBIE).ref_by, OTHER);
+  const before = userRow(OTHER).pro_until;
+  await connect(true, NEWBIE, 'conn-new');
+  const out = sent(take());
+  assert.ok(out.some((c) => c.params.chat_id === OTHER && /начислено/.test(c.params.text) === false)); // у OTHER язык узбекский
+  assert.ok(userRow(OTHER).pro_until >= Math.max(before, now()) + REF.days * 86400 - 5);
+  assert.equal((await chatsEndpoint({}, ctx(OTHER))).refs, 1);
+  const after = userRow(OTHER).pro_until;
+  await connect(false, NEWBIE, 'conn-new');
+  await connect(true, NEWBIE, 'conn-new');       // повторное подключение награду не даёт
+  assert.equal(userRow(OTHER).pro_until, after);
+  await msg(OWNER, { text: `/start ref_${OWNER}` }); // сам себя пригласить нельзя
+  assert.equal(userRow(OWNER).ref_by, null);
+  givePro(OTHER, 0);
+  take();
+});
+
+await step('Рассылка из админ-панели: только админ, порциями, без тех, кто не запускал бота', async () => {
+  const admin = ctx(OWNER_ID);
+  await assert.rejects(() => adminEndpoint({ action: 'broadcast', text: 'x' }, ctx(OWNER)));
+  await assert.rejects(() => adminEndpoint({ action: 'broadcast', text: '  ' }, admin));
+  const started = sqlite.prepare("select count(*) as n from users where name <> ''").get().n;
+  const res = await adminEndpoint({ action: 'broadcast', text: 'Новость <b>для всех</b>' }, admin);
+  const out = sent(take());
+  assert.equal(res.sent, started);
+  assert.equal(res.next, null);
+  assert.equal(out.length, started);
+  assert.ok(out.every((c) => c.params.text === 'Новость &lt;b&gt;для всех&lt;/b&gt;'));
 });
 
 await step('Чужую историю в мини-приложении не видно', async () => {
@@ -332,6 +474,47 @@ await step('С Pro: удалённое голосовое приходит фа�
   const out = take();
   assert.equal(sent(out, 'sendVoice')[0].params.voice, 'voice-1');
   assert.doesNotMatch(texts(out), /\/pro/);
+});
+
+await step('С Pro: фото и голосовое открываются прямо в мини-приложении', async () => {
+  assert.equal(base64(new Uint8Array([72, 105, 33])), 'SGkh');
+  assert.equal(base64(new Uint8Array([72, 105])), 'SGk=');
+  assert.equal(base64(new Uint8Array([72])), 'SA==');
+  assert.deepEqual([...utf8('Я😀')], [...Buffer.from('Я😀')]);
+  const { items } = await feedEndpoint({ type: 'deleted' }, ctx(OWNER));
+  const voice = items.find((i) => i.kind === 'voice');
+  const photo = items.find((i) => i.kind === 'photo');
+  assert.deepEqual(await mediaEndpoint({ id: voice.id }, ctx(OWNER)), { mime: 'audio/ogg', data: 'SGkh' });
+  assert.equal((await mediaEndpoint({ id: photo.id }, ctx(OWNER))).mime, 'image/jpeg');
+  assert.equal(sent(take(), 'getFileContent')[0].params, 'voice-1');
+  await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OTHER)));        // чужой файл
+  await assert.rejects(() => mediaEndpoint({ id: voice.id, thumb: true }, ctx(OWNER))); // превью нет
+  sqlite.prepare("update messages set meta = ? where id = ?").run(JSON.stringify({ size: LIMITS.inlineMedia + 1 }), voice.id);
+  await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)));        // слишком большой
+  sqlite.prepare('update messages set meta = null where id = ?').run(voice.id);
+  failures.rule = (method) => (method === 'getFileContent' ? new BotApiError(method, 400, 'file is too old') : undefined);
+  await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)));        // Telegram файл уже не отдаёт
+});
+
+await step('С Pro: выгрузка переписки с собеседником приходит файлом', async () => {
+  const res = await exportEndpoint({ chatId: FRIEND }, ctx(OWNER));
+  const doc = sent(take(), 'sendDocument')[0].params;
+  assert.equal(doc.chat_id, OWNER);
+  const text = Buffer.from(doc.document.bytes).toString();
+  assert.ok(res.count >= 3);
+  assert.match(text, /Friend: приду в 7/);
+  assert.match(text, /Было \(.+\): приду в 5/);
+  assert.match(text, /🗑 \d{4}-\d\d-\d\d/);
+  await assert.rejects(() => exportEndpoint({ chatId: 12345 }, ctx(OWNER)));
+  givePro(OTHER, 0);
+  await assert.rejects(() => exportEndpoint({ chatId: FRIEND }, ctx(OTHER)));
+});
+
+await step('Оплата из мини-приложения: ссылка на счёт', async () => {
+  givePro(OTHER, 0);
+  const res = await invoiceEndpoint({}, ctx(OTHER));
+  assert.equal(res.pro, false);
+  assert.equal(sent(take(), 'createInvoiceLink')[0].params.subscription_period, PRO.periodSeconds);
 });
 
 await step('С Pro: файл из мини-приложения приходит в чат; чужой — нет', async () => {

@@ -17,6 +17,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Keeper: quiet mode and per-chat mute (events are collected in the Mini App without messages in the chat);
   more data per message (sender, file size and duration, forward origin, edit history with times); `chats` table
   with lifetime counters.
+- Keeper: quiet by default — nothing is sent to the chat; photos, videos and voice messages open inside the Mini App
+  (`media` endpoint). Notification modes: quiet / short / once a day / full, plus "favourites only".
+- Keeper: owner with permanent VIP (`OWNER_ID`), VIP for trusted people (admin panel or `/vip <id>`), a 3-day Pro
+  trial, invite links (+7 days of Pro), Pro payment inside the Mini App, text search, export of a conversation
+  to a file, admin broadcast and a start → connect → pay funnel.
 - Claude setup: `CLAUDE.md`, `.claude/settings.json` (safe command permissions, dependency install on session start),
   skills `/new-client`, `/deploy`, `/check`, `/explain`, a `reviewer` subagent, and `docs/CLAUDE-GUIDE.md`.
 - English README (Russian version moved to `README.ru.md`).

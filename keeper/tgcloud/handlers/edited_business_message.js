@@ -2,7 +2,7 @@
 
 import { ownerOf } from '../lib/business.js';
 import { findMessage, recordEdit, saveMessage, countEvent, getChat } from '../lib/store.js';
-import { notifyEdited } from '../lib/ui.js';
+import { announce } from '../lib/ui.js';
 
 export default async function onEditedBusinessMessage(message) {
   const found = await ownerOf(message.business_connection_id);
@@ -17,6 +17,5 @@ export default async function onEditedBusinessMessage(message) {
   const after = await recordEdit(before, message);
   if (!after) return;
   await countEvent(conn.userId, message.chat.id, 'edited');
-  if (!user.notify || (await getChat(conn.userId, message.chat.id))?.muted) return;
-  await notifyEdited(user, conn.userChatId, before, after);
+  await announce(user, conn.userChatId, await getChat(conn.userId, message.chat.id), { type: 'edited', before, after });
 }

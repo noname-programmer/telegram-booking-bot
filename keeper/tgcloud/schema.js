@@ -11,7 +11,18 @@ export const users = table('users', {
   proUntil: integer('pro_until').notNull().default(0), // до какого времени оплачен Pro
   name:     text('name').notNull().default(''),       // имя из Telegram (для админ-панели)
   username: text('username').notNull().default(''),
-  notify:   integer('notify').notNull().default(1),   // 1 — присылать уведомления в чат, 0 — только история в приложении
+  // Режим уведомлений: 0 тихо, 1 полные, 2 короткие, 3 сводка раз в день. Новым пользователям код ставит 0 (тихо);
+  // значение «по умолчанию 1» осталось в базе с первой версии, менять его база сама не умеет.
+  notify:   integer('notify').notNull().default(1),
+  favOnly:  integer('fav_only').notNull().default(0), // 1 — уведомлять только об избранных собеседниках
+  vip:      integer('vip').notNull().default(0),      // 1 — бессрочный VIP (выдаёт владелец)
+  trial:    integer('trial').notNull().default(0),    // 1 — пробный Pro уже выдан
+  tz:       integer('tz').notNull().default(300),     // часовой пояс в минутах (Ташкент = 300), нужен для сводки
+  refBy:    integer('ref_by'),                        // кто пригласил
+  refDone:  integer('ref_done').notNull().default(0), // 1 — пригласивший уже получил награду
+  digestDay: integer('digest_day').notNull().default(0), // сводка: за какой день копим счётчики
+  digestDel: integer('digest_del').notNull().default(0),
+  digestEd:  integer('digest_ed').notNull().default(0),
   created:  integer('created_at').notNull().default(0),
 });
 
@@ -62,6 +73,7 @@ export const chats = table('chats', {
   deleted:  integer('deleted').notNull().default(0),  // сколько из них удалено
   edited:   integer('edited').notNull().default(0),   // сколько правок
   muted:    integer('muted').notNull().default(0),    // 1 — не присылать уведомления по этому чату
+  fav:      integer('fav').notNull().default(0),      // 1 — избранный собеседник
   firstAt:  integer('first_at').notNull().default(0),
   lastAt:   integer('last_at').notNull().default(0),  // последнее сообщение
   eventAt:  integer('event_at').notNull().default(0), // последнее удаление или правка

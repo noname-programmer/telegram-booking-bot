@@ -203,6 +203,41 @@
                color: var(--hint); font-size: 10.5px; font-weight: 650; transition: color .18s, background .18s; }
   nav button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   nav button.on { color: var(--accent); background: var(--soft); }
+  .badge-vip { font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 4px 9px; border-radius: 999px; color: #fff;
+               background: linear-gradient(135deg, #7c5cff, #e5489d); }
+  .plan.vip { background: linear-gradient(135deg, #7c5cff, #b04ce0 55%, #e5489d); }
+  .pill.vip { color: #fff; background: linear-gradient(135deg, #7c5cff, #e5489d); }
+  .radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
+  .radio.on { border-color: var(--accent); } .radio.on::after { content: ""; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); }
+  .field { width: 100%; border: 0; outline: 0; background: var(--soft); color: var(--text); font: inherit; padding: 11px 13px; border-radius: 12px; resize: none; }
+  .field::placeholder { color: var(--hint); }
+  .inline { display: flex; gap: 8px; align-items: center; }
+  .inline .btn { flex: none; padding: 11px 16px; }
+  .reflink { background: var(--soft); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--link); margin: 10px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card.funnel { padding: 8px 16px; }
+  .funnel .step { padding: 7px 0; }
+  .funnel .step div:first-child { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 5px; }
+  .funnel .step b { font-variant-numeric: tabular-nums; }
+  .funnel .track { height: 10px; border-radius: 6px; background: var(--soft); overflow: hidden; }
+  .funnel .fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #2f7cf6, #22c1c3); }
+  /* ---------- медиа внутри события ---------- */
+  .media { margin-top: 8px; border-radius: 12px; overflow: hidden; background: var(--soft); position: relative; min-height: 54px; }
+  .media img, .media video { display: block; width: 100%; max-height: 420px; object-fit: contain; background: #000; }
+  .media.round video, .media.round img { aspect-ratio: 1; object-fit: cover; border-radius: 50%; max-width: 240px; margin: 8px auto; }
+  .media.sticker { background: none; } .media.sticker img, .media.sticker video { max-width: 160px; background: none; }
+  .media audio { display: block; width: 100%; }
+  .media .play { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; color: #fff; }
+  .media .play i { width: 54px; height: 54px; border-radius: 50%; background: rgba(0, 0, 0, .55); display: grid; place-items: center; }
+  .media .listen { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 13px; font-weight: 650; font-size: 14px; }
+  .media .listen i { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; flex: none; }
+  .media .wait { padding: 16px; text-align: center; color: var(--hint); font-size: 13px; }
+  .ev .btn.ghost { background: var(--soft); color: var(--text); }
+  /* ---------- выезжающая панель с действиями ---------- */
+  .shade { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; animation: fade .15s; }
+  .sheet { width: 100%; background: var(--card); border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + var(--safe-b)); animation: up .22s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes up { from { transform: translateY(100%); } }
+  .sheet h3 { margin: 0 0 2px; font-size: 18px; } .sheet p { margin: 0 0 14px; color: var(--hint); font-size: 13.5px; }
+  .sheet .btn { width: 100%; margin-bottom: 8px; padding: 12px; }
   .toast { position: fixed; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); z-index: 9; max-width: 86%;
            background: rgba(20, 22, 28, .92); color: #fff; padding: 9px 15px; border-radius: 12px; font-size: 13.5px; text-align: center; animation: fade .2s; }
 </style>
@@ -255,6 +290,24 @@ const TEXTS = {
     aNew: 'Новые пользователи за 14 дней', aList: 'Пользователи', aPays: 'Последние оплаты', aNoPays: 'Оплат пока не было',
     aNote: 'Админ видит только цифры. Тексты сообщений пользователей здесь не показываются.',
     aGive: 'Pro для {name}', aGiveHint: 'Сейчас: {state}', a30: '+30 дней', a365: '+1 год', aOff: 'Снять Pro', aDone: 'Готово', aNoPro: 'нет Pro', aChatsShort: 'чатов', aOn: 'подключён', aOffline: 'не подключён',
+    modesTitle: 'Уведомления в чате с ботом',
+    modes: [['Тихо', 'В чат ничего не приходит — всё только здесь'], ['Полностью', 'Полный текст каждого удаления и правки'], ['Коротко', 'Одна строка с кнопкой «Открыть»'], ['Раз в день', 'Одно сообщение при первом событии дня']],
+    favOnly: 'Только избранные', favOnlyHint: 'Уведомлять лишь о собеседниках со звёздочкой',
+    planOwner: 'Владелец', planVip: 'VIP', forever: 'Бессрочно. Все возможности Pro, оплата не нужна.',
+    paid: 'Pro подключён 🎉', payFail: 'Оплата не прошла',
+    refTitle: 'Пригласить друга', refHint: 'Когда друг подключит бота, вы получите {d} дней Pro.', refCount: 'Приглашено друзей: {n}',
+    shareBtn: 'Поделиться', copy: 'Скопировать', copied: 'Ссылка скопирована', shareText: 'Keeper показывает сообщения, которые собеседник удалил или изменил',
+    fav: 'В избранное', unfav: 'В избранном', exportBtn: 'Выгрузить переписку в файл', exporting: 'Готовлю файл…',
+    searchText: 'Поиск по тексту и имени', notFound: 'Ничего не найдено',
+    listen: 'Прослушать', watch: 'Смотреть', loadingMedia: 'Загружаю…', mediaErr: 'Не удалось показать. Попробуйте «Прислать файл в чат».',
+    toChat: 'Прислать файл в чат',
+    funnel: 'Путь пользователя', fStarted: 'Запустили бота', fConnected: 'Подключили к аккаунту', fPaid: 'Оплатили Pro',
+    aVip: 'VIP', aRefs: 'Приглашений', aGiveVip: '💎 Выдать бессрочный VIP', aTakeVip: 'Снять VIP',
+    vipById: 'Выдать VIP по ID', vipByIdHint: 'Можно заранее, даже если человек ещё не запускал бота. ID показывает @userinfobot.',
+    idPlaceholder: 'ID пользователя', give: 'Выдать', badId: 'Введите ID цифрами',
+    bcTitle: 'Рассылка', bcHint: 'Сообщение получат все, кто запускал бота.', bcPlaceholder: 'Текст сообщения', bcSend: 'Разослать всем',
+    bcAsk: 'Отправить это сообщение всем пользователям ({n})?', bcDone: 'Доставлено: {s}, не доставлено: {f}', bcProgress: 'Отправляю… {s}',
+    findUser: 'Поиск по имени или ID', aOwner: 'ВЛАДЕЛЕЦ', close: 'Закрыть',
     cancel: 'Отмена', error: 'Не получилось загрузить', retry: 'Повторить', today: 'Сегодня', yesterday: 'Вчера',
     units: { s: 'с', m: 'мин', h: 'ч', d: 'дн' },
     kinds: { text: 'Текст', photo: 'Фото', video: 'Видео', video_note: 'Кружок', voice: 'Голосовое', audio: 'Аудио', document: 'Файл', animation: 'GIF', sticker: 'Стикер', other: 'Другое' },
@@ -294,6 +347,24 @@ const TEXTS = {
     aNew: '14 kundagi yangi foydalanuvchilar', aList: 'Foydalanuvchilar', aPays: "So'nggi to'lovlar", aNoPays: "To'lovlar hali yo'q",
     aNote: "Admin faqat raqamlarni ko'radi. Foydalanuvchilar xabarlari matni bu yerda ko'rsatilmaydi.",
     aGive: '{name} uchun Pro', aGiveHint: 'Hozir: {state}', a30: '+30 kun', a365: '+1 yil', aOff: 'Pro ni olib tashlash', aDone: 'Tayyor', aNoPro: "Pro yo'q", aChatsShort: 'chat', aOn: 'ulangan', aOffline: 'ulanmagan',
+    modesTitle: 'Bot bilan chatdagi bildirishnomalar',
+    modes: [['Jim', 'Chatga hech narsa kelmaydi — hammasi faqat shu yerda'], ["To'liq", "Har bir o'chirish va tahrirning to'liq matni"], ['Qisqa', '«Ochish» tugmasi bilan bir qator'], ['Kuniga bir marta', 'Kunning birinchi hodisasida bitta xabar']],
+    favOnly: 'Faqat tanlanganlar', favOnlyHint: 'Faqat yulduzchali suhbatdoshlar haqida bildirish',
+    planOwner: 'Bot egasi', planVip: 'VIP', forever: "Muddatsiz. Pro ning barcha imkoniyatlari, to'lov kerak emas.",
+    paid: 'Pro ulandi 🎉', payFail: "To'lov amalga oshmadi",
+    refTitle: "Do'stni taklif qilish", refHint: "Do'stingiz botni ulasa, siz {d} kun Pro olasiz.", refCount: "Taklif qilingan do'stlar: {n}",
+    shareBtn: 'Ulashish', copy: 'Nusxalash', copied: 'Havola nusxalandi', shareText: "Keeper suhbatdosh o'chirgan yoki o'zgartirgan xabarlarni ko'rsatadi",
+    fav: 'Tanlanganlarga', unfav: 'Tanlangan', exportBtn: 'Yozishmalarni faylga chiqarish', exporting: 'Fayl tayyorlanmoqda…',
+    searchText: "Matn va ism bo'yicha qidirish", notFound: 'Hech narsa topilmadi',
+    listen: 'Tinglash', watch: "Ko'rish", loadingMedia: 'Yuklanmoqda…', mediaErr: "Ko'rsatib bo'lmadi. «Faylni chatga yuborish» ni sinab ko'ring.",
+    toChat: 'Faylni chatga yuborish',
+    funnel: "Foydalanuvchi yo'li", fStarted: 'Botni ishga tushirgan', fConnected: 'Akkauntga ulagan', fPaid: "Pro uchun to'lagan",
+    aVip: 'VIP', aRefs: 'Takliflar', aGiveVip: '💎 Muddatsiz VIP berish', aTakeVip: 'VIP ni olib tashlash',
+    vipById: "ID bo'yicha VIP berish", vipByIdHint: "Oldindan ham mumkin, odam botni hali ishga tushirmagan bo'lsa ham. ID ni @userinfobot ko'rsatadi.",
+    idPlaceholder: 'Foydalanuvchi ID', give: 'Berish', badId: 'ID ni raqamlar bilan kiriting',
+    bcTitle: 'Xabar tarqatish', bcHint: 'Xabarni botni ishga tushirgan hamma oladi.', bcPlaceholder: 'Xabar matni', bcSend: 'Hammaga yuborish',
+    bcAsk: 'Bu xabar barcha foydalanuvchilarga ({n}) yuborilsinmi?', bcDone: 'Yetkazildi: {s}, yetkazilmadi: {f}', bcProgress: 'Yuborilmoqda… {s}',
+    findUser: "Ism yoki ID bo'yicha qidirish", aOwner: 'EGASI', close: 'Yopish',
     cancel: 'Bekor qilish', error: "Yuklab bo'lmadi", retry: 'Qayta urinish', today: 'Bugun', yesterday: 'Kecha',
     units: { s: 's', m: 'daq', h: 'soat', d: 'kun' },
     kinds: { text: 'Matn', photo: 'Rasm', video: 'Video', video_note: 'Dumaloq video', voice: 'Ovozli xabar', audio: 'Audio', document: 'Fayl', animation: 'GIF', sticker: 'Stiker', other: 'Boshqa' },
@@ -333,6 +404,24 @@ const TEXTS = {
     aNew: 'New users in 14 days', aList: 'Users', aPays: 'Recent payments', aNoPays: 'No payments yet',
     aNote: 'The admin sees numbers only. The text of users’ messages is never shown here.',
     aGive: 'Pro for {name}', aGiveHint: 'Now: {state}', a30: '+30 days', a365: '+1 year', aOff: 'Remove Pro', aDone: 'Done', aNoPro: 'no Pro', aChatsShort: 'chats', aOn: 'connected', aOffline: 'not connected',
+    modesTitle: 'Notifications in the chat with the bot',
+    modes: [['Quiet', 'Nothing is sent to the chat — everything stays here'], ['Full', 'The full text of every deletion and edit'], ['Short', 'One line with an “Open” button'], ['Once a day', 'One message on the first event of the day']],
+    favOnly: 'Favourites only', favOnlyHint: 'Notify only about people marked with a star',
+    planOwner: 'Owner', planVip: 'VIP', forever: 'Forever. Every Pro feature, no payment needed.',
+    paid: 'Pro is on 🎉', payFail: 'The payment did not go through',
+    refTitle: 'Invite a friend', refHint: 'When your friend connects the bot, you get {d} days of Pro.', refCount: 'Friends invited: {n}',
+    shareBtn: 'Share', copy: 'Copy', copied: 'Link copied', shareText: 'Keeper shows messages that the other person deleted or edited',
+    fav: 'Add to favourites', unfav: 'Favourite', exportBtn: 'Export the conversation to a file', exporting: 'Preparing the file…',
+    searchText: 'Search by text and name', notFound: 'Nothing found',
+    listen: 'Listen', watch: 'Watch', loadingMedia: 'Loading…', mediaErr: 'Could not show it. Try “Send the file to chat”.',
+    toChat: 'Send the file to chat',
+    funnel: 'User journey', fStarted: 'Started the bot', fConnected: 'Connected to the account', fPaid: 'Paid for Pro',
+    aVip: 'VIP', aRefs: 'Invites', aGiveVip: '💎 Give VIP forever', aTakeVip: 'Remove VIP',
+    vipById: 'Give VIP by ID', vipByIdHint: 'Works in advance, even if the person has not started the bot yet. @userinfobot shows the ID.',
+    idPlaceholder: 'User ID', give: 'Give', badId: 'Enter the ID in digits',
+    bcTitle: 'Broadcast', bcHint: 'Everyone who started the bot gets the message.', bcPlaceholder: 'Message text', bcSend: 'Send to everyone',
+    bcAsk: 'Send this message to all users ({n})?', bcDone: 'Delivered: {s}, not delivered: {f}', bcProgress: 'Sending… {s}',
+    findUser: 'Search by name or ID', aOwner: 'OWNER', close: 'Close',
     cancel: 'Cancel', error: 'Could not load', retry: 'Try again', today: 'Today', yesterday: 'Yesterday',
     units: { s: 's', m: 'min', h: 'h', d: 'd' },
     kinds: { text: 'Text', photo: 'Photo', video: 'Video', video_note: 'Video message', voice: 'Voice message', audio: 'Audio', document: 'File', animation: 'GIF', sticker: 'Sticker', other: 'Other' },
@@ -362,6 +451,11 @@ const ICON = {
   inbox: '<path d="M4 13l2.500-8h11L20 13v6H4v-6Z"/><path d="M4 13h5a3 3 0 0 0 6 0h5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.5"/>',
   file: '<path d="M14 3H7v18h10V6l-3-3Z"/><path d="M14 3v3h3"/>',
+  play: '<path d="M8 5l11 7-11 7V5Z" fill="currentColor"/>',
+  download: '<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+  gift: '<path d="M4 11h16v9H4v-9ZM3 7h18v4H3V7ZM12 7v13M12 7c-1-3-5-3-5-.5S10 7 12 7Zm0 0c1-3 5-3 5-.5S14 7 12 7Z"/>',
+  megaphone: '<path d="M4 10v4h3l8 5V5L7 10H4Z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
+  crown: '<path d="M4 18h16M4 15l-1-8 5 4 4-6 4 6 5-4-1 8H4Z"/>',
 };
 const icon = (name, size) => svg(ICON[name], size);
 
@@ -459,7 +553,7 @@ function chrome() {
   $('subtitle').textContent = openChat && tab === 'chats' ? (openChat.username ? `@${openChat.username}` : L.sub.chats) : L.sub[tab];
   $('logo').innerHTML = icon('shield', 24);
   const badge = $('plan-badge');
-  badge.replaceChildren(me ? h('span', { class: me.pro ? 'badge-pro' : 'badge-free' }, me.pro ? 'PRO' : L.planFree) : '');
+  badge.replaceChildren(me ? planBadge(me.plan) : '');
 
   const names = ['chats', 'feed', 'stats', 'me'];
   if (me?.admin) names.push('admin');
@@ -471,6 +565,22 @@ function chrome() {
   if (openChat && tab === 'chats') { tg.BackButton.show(); } else { tg.BackButton.hide(); }
 }
 tg.BackButton.onClick(() => { openChat = null; go('chats'); });
+
+function planBadge(plan) {
+  if (plan === 'owner') return h('span', { class: 'badge-vip' }, `👑 ${L.aOwner}`);
+  if (plan === 'vip') return h('span', { class: 'badge-vip' }, '💎 VIP');
+  return h('span', { class: plan === 'pro' ? 'badge-pro' : 'badge-free' }, plan === 'pro' ? 'PRO' : L.planFree);
+}
+
+// Выезжающая снизу панель с кнопками. buttons: [{ text, cls, run }]
+function sheet(title, hint, buttons) {
+  const close = () => shade.remove();
+  const shade = h('div', { class: 'shade', onclick: (e) => { if (e.target === shade) close(); } },
+    h('div', { class: 'sheet' }, h('h3', {}, title), h('p', {}, hint),
+      buttons.map((b) => h('button', { class: `btn ${b.cls || ''}`, onclick: () => { haptic('medium'); close(); b.run(); } }, b.text)),
+      h('button', { class: 'btn', onclick: close }, L.close)));
+  document.body.append(shade);
+}
 
 function go(name) {
   if (name !== tab) { openChat = name === 'chats' ? openChat : null; filter = 'all'; }
@@ -513,7 +623,7 @@ const segmented = (onPick) => h('div', { class: 'seg' }, [['all', L.all], ['dele
 async function showChats() {
   if (!chatsCache.length) loading();
   let data;
-  try { data = await call('chats'); } catch { return failed(showChats); }
+  try { data = await call('chats', { tz: -new Date().getTimezoneOffset() }); } catch { return failed(showChats); }
   if (tab !== 'chats' || openChat) return;
   remember(data);
   chatsCache = data.chats;
@@ -548,7 +658,7 @@ function chatRow(c) {
   return h('button', { class: 'row', onclick: () => { haptic(); openChat = c; filter = 'all'; go('chats'); } },
     avatar(c.name, c.chatId),
     h('div', { class: 'mid' },
-      h('div', { class: 'name' }, h('span', {}, c.name || '?'), c.muted && h('i', { class: 'hint', html: icon('bellOff', 14) })),
+      h('div', { class: 'name' }, h('span', {}, c.name || '?'), c.fav && '⭐', c.muted && h('i', { class: 'hint', html: icon('bellOff', 14) })),
       h('div', { class: 'sub' }, sub)),
     h('div', { class: 'pills' },
       c.deleted > 0 && h('span', { class: 'pill red' }, `🗑 ${num(c.deleted)}`),
@@ -576,6 +686,27 @@ async function showChat() {
   };
   paintMute();
 
+  const favBtn = h('button', { class: 'btn' });
+  const paintFav = () => favBtn.replaceChildren(c.fav ? '⭐' : h('i', { html: icon('star', 17) }), c.fav ? L.unfav : L.fav);
+  favBtn.onclick = async () => {
+    haptic('medium');
+    c.fav = !c.fav;
+    paintFav();
+    try { await call('settings', { fav: { chatId: c.chatId, fav: c.fav } }); } catch { c.fav = !c.fav; paintFav(); }
+  };
+  paintFav();
+
+  const exportBtn = me?.pro && h('button', { class: 'btn', style: 'margin-top:8px; width:100%' }, h('i', { html: icon('download', 17) }), L.exportBtn);
+  if (exportBtn) {
+    exportBtn.onclick = async () => {
+      haptic('medium');
+      exportBtn.disabled = true;
+      toast(L.exporting);
+      try { toast((await call('export', { chatId: c.chatId })).message); } catch (err) { tg.showAlert(err.message || L.error); }
+      exportBtn.disabled = false;
+    };
+  }
+
   view().replaceChildren(h('div', { class: 'fade' },
     h('div', { class: 'card hero' },
       avatar(c.name, c.chatId, 'big'),
@@ -586,9 +717,10 @@ async function showChat() {
         h('div', {}, h('b', { style: 'color:var(--red)' }, num(c.deleted)), h('span', {}, L.deleted)),
         h('div', {}, h('b', { style: 'color:var(--amber)' }, num(c.edited)), h('span', {}, L.edited)),
         h('div', {}, h('b', {}, `${share}%`), h('span', {}, L.share))),
-      h('div', { class: 'actions' },
-        muteBtn,
-        c.username && h('button', { class: 'btn primary', onclick: () => tg.openTelegramLink(`https://t.me/${c.username}`) }, h('i', { html: icon('send', 17) }), L.openChat))),
+      h('div', { class: 'actions' }, muteBtn, favBtn),
+      c.username && h('button', { class: 'btn primary', style: 'margin-top:8px; width:100%', onclick: () => tg.openTelegramLink(`https://t.me/${c.username}`) },
+        h('i', { html: icon('send', 17) }), L.openChat),
+      exportBtn),
     h('div', { class: 'card' },
       h('div', { class: 'kv' }, h('span', {}, L.first), h('b', {}, c.firstAt ? `${midDate(c.firstAt)}, ${clock(c.firstAt)}` : '—')),
       h('div', { class: 'kv' }, h('span', {}, L.last), h('b', {}, c.lastAt ? `${midDate(c.lastAt)}, ${clock(c.lastAt)}` : '—'))),
@@ -606,15 +738,30 @@ async function showChat() {
 // ============================================================================
 // Экран «Лента»: все события подряд.
 // ============================================================================
+let feedQuery = '';
+let feedTimer = null;
 async function showFeed() {
-  loading();
-  let data;
-  try { data = await call('feed', { type: filter }); } catch { return failed(showFeed); }
-  if (tab !== 'feed') return;
-  remember(data);
+  const box = h('div', {}, Array.from({ length: 4 }, () => h('div', { class: 'skel' })));
+  const input = h('input', { type: 'search', placeholder: L.searchText, value: feedQuery });
+  input.oninput = () => {
+    feedQuery = input.value;
+    clearTimeout(feedTimer);
+    feedTimer = setTimeout(fetchFeed, 350); // ждём, пока человек допечатает
+  };
+  async function fetchFeed() {
+    const asked = feedQuery;
+    let data;
+    try { data = await call('feed', { type: filter, q: asked }); } catch { return box.replaceChildren(h('div', { class: 'empty' }, L.error)); }
+    if (tab !== 'feed' || asked !== feedQuery) return;
+    remember(data);
+    box.replaceChildren(...(data.items.length ? events(data.items, true)
+      : [asked ? empty(L.notFound, '', 'search') : empty(L.emptyFeed, L.emptyFeedHint)]));
+  }
   view().replaceChildren(h('div', { class: 'fade' },
-    banners(), segmented(showFeed),
-    data.items.length ? events(data.items, true) : empty(L.emptyFeed, L.emptyFeedHint)));
+    me && banners(), segmented(showFeed),
+    h('div', { class: 'search' }, h('i', { html: icon('search', 18) }), input),
+    box));
+  await fetchFeed();
 }
 
 // Список событий с разделителями по дням.
@@ -679,7 +826,8 @@ function eventCard(item, withName) {
   card.append(facts);
 
   if (item.hasFile && me.pro) {
-    const btn = h('button', { class: 'btn primary' }, h('i', { html: icon('send', 16) }), L.sendFile);
+    card.append(mediaBox(item));
+    const btn = h('button', { class: 'btn ghost' }, h('i', { html: icon('send', 16) }), L.toChat);
     btn.onclick = async () => {
       haptic('medium');
       btn.disabled = true;
@@ -691,6 +839,73 @@ function eventCard(item, withName) {
     card.append(h('div', { class: 'lock' }, L.fileLocked));
   }
   return card;
+}
+
+// ---------- показ фото, видео и голосовых прямо в приложении ----------
+const mediaCache = new Map(); // чтобы не скачивать один файл дважды
+async function mediaUrl(id, thumb = false) {
+  const key = `${id}:${thumb}`;
+  if (!mediaCache.has(key)) {
+    mediaCache.set(key, call('media', { id, thumb }).then((res) => {
+      const raw = atob(res.data);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      return { url: URL.createObjectURL(new Blob([bytes], { type: res.mime })), mime: res.mime };
+    }).catch((err) => { mediaCache.delete(key); throw err; }));
+  }
+  return mediaCache.get(key);
+}
+// Загружает картинку, только когда карточка появилась на экране.
+const lazy = new IntersectionObserver((entries) => {
+  for (const e of entries) if (e.isIntersecting) { lazy.unobserve(e.target); e.target.load(); }
+}, { rootMargin: '300px' });
+
+function mediaBox(item) {
+  const meta = item.meta || {};
+  const big = (meta.size || 0) > (me.inlineMedia || 0);
+  const kind = item.kind;
+  const isImage = kind === 'photo' || (kind === 'sticker' && meta.sticker !== 'video' && meta.sticker !== 'animated') || (kind === 'document' && /^image\//.test(meta.mime || ''));
+  const isVideo = ['video', 'video_note', 'animation'].includes(kind) || (kind === 'sticker' && meta.sticker === 'video');
+  const isAudio = kind === 'voice' || kind === 'audio';
+  const box = h('div', { class: `media${kind === 'video_note' ? ' round' : ''}${kind === 'sticker' ? ' sticker' : ''}` });
+  const wait = () => box.replaceChildren(h('div', { class: 'wait' }, L.loadingMedia));
+  const fail = (err) => box.replaceChildren(h('div', { class: 'wait' }, err?.message && err.type === 'ENDPOINT_ERROR' ? err.message : L.mediaErr));
+
+  if (isImage && !big) {
+    wait();
+    box.load = () => mediaUrl(item.id).then(({ url }) => box.replaceChildren(h('img', { src: url, alt: '' })), fail);
+    lazy.observe(box);
+  } else if (isVideo && !big) {
+    const play = () => {
+      wait();
+      mediaUrl(item.id).then(({ url }) => {
+        const video = h('video', { src: url, controls: '', autoplay: '', playsinline: '', loop: kind === 'animation' || kind === 'sticker' ? '' : null });
+        video.muted = kind === 'animation' || kind === 'sticker';
+        video.onerror = () => fail();
+        box.replaceChildren(video);
+      }, fail);
+    };
+    const button = h('button', { class: 'play', onclick: () => { haptic(); play(); } }, h('i', { html: icon('play', 24) }));
+    box.style.minHeight = '150px';
+    box.append(button);
+    if (item.hasThumb) {
+      box.load = () => mediaUrl(item.id, true).then(({ url }) => { if (button.isConnected) box.prepend(h('img', { src: url, alt: '' })); }, () => {});
+      lazy.observe(box);
+    }
+  } else if (isAudio && !big) {
+    box.append(h('button', { class: 'listen', onclick: () => {
+      haptic();
+      wait();
+      mediaUrl(item.id).then(({ url }) => {
+        const audio = h('audio', { src: url, controls: '', autoplay: '' });
+        audio.onerror = () => fail();
+        box.replaceChildren(audio);
+      }, fail);
+    } }, h('i', { html: icon('play', 16) }), `${L.listen}${meta.duration ? ` · ${mmss(meta.duration)}` : ''}`));
+  } else {
+    return h('div', { class: 'lock' }, [meta.fileName, meta.size && bytes(meta.size)].filter(Boolean).join(' · '));
+  }
+  return box;
 }
 
 // ============================================================================
@@ -757,21 +972,62 @@ async function showMe() {
   if (!me) { loading(3); try { remember(await call('chats')); } catch { return failed(showMe); } }
   if (tab !== 'me') return;
   const save = async (input) => { try { remember(await call('settings', input)); } catch { toast(L.error); } showMe(); };
+  const perks = (n) => h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n, d: me.proDays }))));
 
-  const plan = me.pro
-    ? h('div', { class: 'plan pro' }, h('small', {}, L.planNow), h('h2', {}, '⭐️ Pro'), h('p', {}, fill(L.until, { date: fullDate(me.proUntil) })),
-      h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n: me.limit, d: me.proDays })))))
-    : h('div', { class: 'plan' }, h('small', {}, L.planNow), h('h2', {}, L.planFree), h('p', {}, fill(L.freeDesc, { d: me.freeDays })),
-      h('ul', {}, L.perks.map((p) => h('li', {}, fill(p, { n: 100, d: me.proDays })))),
-      h('button', { class: 'btn', onclick: () => { haptic('medium'); tg.showAlert(L.buyHint, () => tg.close()); } }, fill(L.buy, { stars: me.stars })));
+  async function buy(btn) {
+    haptic('medium');
+    btn.disabled = true;
+    try {
+      const { url } = await call('invoice');
+      tg.openInvoice(url, async (status) => {
+        if (status === 'paid') { toast(L.paid); setTimeout(async () => { try { remember(await call('chats')); } catch { /* обновится позже */ } showMe(); }, 1500); }
+        else if (status === 'failed') toast(L.payFail);
+      });
+    } catch { toast(L.error); }
+    btn.disabled = false;
+  }
+
+  let plan;
+  if (me.plan === 'owner' || me.plan === 'vip') {
+    plan = h('div', { class: 'plan vip' }, h('small', {}, L.planNow), h('h2', {}, me.plan === 'owner' ? `👑 ${L.planOwner} · VIP` : '💎 VIP'), h('p', {}, L.forever), perks(me.limit));
+  } else if (me.plan === 'pro') {
+    plan = h('div', { class: 'plan pro' }, h('small', {}, L.planNow), h('h2', {}, '⭐️ Pro'), h('p', {}, fill(L.until, { date: fullDate(me.proUntil) })), perks(me.limit));
+  } else {
+    const btn = h('button', { class: 'btn' }, fill(L.buy, { stars: me.stars }));
+    btn.onclick = () => buy(btn);
+    plan = h('div', { class: 'plan' }, h('small', {}, L.planNow), h('h2', {}, L.planFree), h('p', {}, fill(L.freeDesc, { d: me.freeDays })), perks(me.proLimit), btn);
+  }
+
+  // Порядок на экране: тихо, коротко, раз в день, полностью (числа — режимы на сервере).
+  const modes = [0, 2, 3, 1].map((mode) => h('button', { class: 'opt', onclick: () => { haptic(); if (mode !== me.notify) save({ notify: mode }); } },
+    h('div', { class: `ic ${mode === 0 ? 'amber' : 'green'}`, html: icon(mode === 0 ? 'bellOff' : 'bell', 18) }),
+    h('div', { class: 'mid' }, h('div', {}, L.modes[mode][0]), h('small', {}, L.modes[mode][1])),
+    h('div', { class: `radio${mode === me.notify ? ' on' : ''}` })));
+
+  const link = me.bot ? `https://t.me/${me.bot}?start=ref_${me.id}` : '';
+  const copy = async () => { try { await navigator.clipboard.writeText(link); toast(L.copied); } catch { tg.showAlert(link); } };
 
   view().replaceChildren(h('div', { class: 'fade' },
     plan,
+    h('div', { class: 'section' }, L.modesTitle),
+    h('div', { class: 'card' }, modes,
+      me.notify !== 0 && h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ favOnly: !me.favOnly }); } },
+        h('div', { class: 'ic amber', html: icon('star', 18) }),
+        h('div', { class: 'mid' }, h('div', {}, L.favOnly), h('small', {}, L.favOnlyHint)),
+        h('div', { class: `switch${me.favOnly ? ' on' : ''}` }))),
+    link && [
+      h('div', { class: 'section' }, L.refTitle),
+      h('div', { class: 'card pad' },
+        h('div', { style: 'display:flex; gap:12px; align-items:center' },
+          h('div', { class: 'ic', style: 'flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center; color:#fff; background:linear-gradient(135deg,#f7b500,#f0731b)', html: icon('gift', 20) }),
+          h('div', {}, h('div', { style: 'font-weight:650' }, fill(L.refHint, { d: me.refDays })), h('div', { class: 'hint' }, fill(L.refCount, { n: me.refs })))),
+        h('div', { class: 'reflink' }, link),
+        h('div', { class: 'actions', style: 'margin-top:0' },
+          h('button', { class: 'btn primary', onclick: () => { haptic(); tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(L.shareText)}`); } }, h('i', { html: icon('send', 16) }), L.shareBtn),
+          h('button', { class: 'btn', onclick: copy }, L.copy))),
+    ],
+    h('div', { class: 'section' }, L.tabs.me),
     h('div', { class: 'card' },
-      h('button', { class: 'opt', onclick: () => { haptic('medium'); save({ notify: !me.notify }); } },
-        h('div', { class: `ic ${me.notify ? 'green' : 'amber'}`, html: icon(me.notify ? 'bell' : 'bellOff', 18) }),
-        h('div', { class: 'mid' }, h('div', {}, L.notify), h('small', {}, me.notify ? L.notifyOn : L.notifyOff)),
-        h('div', { class: `switch${me.notify ? ' on' : ''}` })),
       h('div', { class: 'opt' },
         h('div', { class: 'ic violet', html: icon('globe', 18) }),
         h('div', { class: 'mid' }, h('div', {}, L.lang)),
@@ -793,36 +1049,84 @@ async function showMe() {
 // ============================================================================
 // Экран «Админ»: только для владельца бота (проверяется на сервере).
 // ============================================================================
+let adminQuery = '';
 async function showAdmin(input = {}) {
   if (!input.action) loading(4);
   let data;
-  try { data = await call('admin', input); } catch { return failed(() => showAdmin()); }
+  try { data = await call('admin', input); } catch { toast(L.error); return input.action ? showAdmin() : failed(() => showAdmin()); }
   if (tab !== 'admin') return;
   remember(data);
   const t = data.totals;
+  const act = async (payload) => { await showAdmin(payload); toast(L.aDone); };
 
-  const userRow = (u) => h('button', { class: 'row', onclick: () => givePro(u) },
+  const userRow = (u) => h('button', { class: 'row', onclick: () => manage(u) },
     avatar(u.name || String(u.id), u.id),
     h('div', { class: 'mid' },
       h('div', { class: 'name' }, h('span', {}, u.name || `ID ${u.id}`)),
       h('div', { class: 'sub' }, [u.username && `@${u.username}`, `ID ${u.id}`, u.lang.toUpperCase(), shortDate(u.created)].filter(Boolean).join(' · ')),
       h('div', { class: 'sub' }, `${num(u.chats)} ${L.aChatsShort} · 🗑 ${num(u.deleted)} · ✏️ ${num(u.edited)}`)),
     h('div', { class: 'pills' },
-      u.pro && h('span', { class: 'pill gold' }, 'PRO'),
+      u.owner ? h('span', { class: 'pill vip' }, `👑 ${L.aOwner}`) : u.vip ? h('span', { class: 'pill vip' }, '💎 VIP') : u.pro && h('span', { class: 'pill gold' }, 'PRO'),
       h('span', { class: `pill ${u.connected ? 'green' : 'gray'}` }, u.connected ? L.aOn : L.aOffline)));
 
-  function givePro(u) {
+  function manage(u) {
     haptic();
-    tg.showPopup({
-      title: fill(L.aGive, { name: u.name || u.id }),
-      message: fill(L.aGiveHint, { state: u.pro ? fill(L.until, { date: fullDate(u.proUntil) }) : L.aNoPro }),
-      buttons: [{ id: '30', type: 'default', text: L.a30 }, { id: '365', type: 'default', text: L.a365 }, u.pro ? { id: '0', type: 'destructive', text: L.aOff } : { id: 'x', type: 'cancel' }],
-    }, async (id) => {
-      if (!['30', '365', '0'].includes(id)) return;
-      await showAdmin({ action: 'pro', userId: u.id, days: Number(id) });
-      toast(L.aDone);
-    });
+    if (u.owner) return toast(`👑 ${L.planOwner} · VIP`);
+    const state = u.vip ? `💎 VIP` : u.pro ? fill(L.until, { date: fullDate(u.proUntil) }) : L.aNoPro;
+    sheet(u.name || `ID ${u.id}`, fill(L.aGiveHint, { state }), [
+      u.vip ? { text: L.aTakeVip, cls: 'danger', run: () => act({ action: 'vip', userId: u.id, on: false }) }
+        : { text: L.aGiveVip, cls: 'primary', run: () => act({ action: 'vip', userId: u.id, on: true }) },
+      { text: `Pro ${L.a30}`, run: () => act({ action: 'pro', userId: u.id, days: 30 }) },
+      { text: `Pro ${L.a365}`, run: () => act({ action: 'pro', userId: u.id, days: 365 }) },
+      u.pro && !u.vip && { text: L.aOff, cls: 'danger', run: () => act({ action: 'pro', userId: u.id, days: 0 }) },
+    ].filter(Boolean));
   }
+
+  // Список пользователей с поиском.
+  const list = h('div', { class: 'card' });
+  const draw = () => {
+    const q = adminQuery.trim().toLowerCase();
+    const rows = data.users.filter((u) => !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || String(u.id).includes(q));
+    list.replaceChildren(...rows.map(userRow));
+    list.style.display = rows.length ? '' : 'none';
+  };
+  const find = h('input', { type: 'search', placeholder: L.findUser, value: adminQuery, oninput: (e) => { adminQuery = e.target.value; draw(); } });
+
+  // Выдать VIP по ID.
+  const idInput = h('input', { class: 'field', type: 'text', inputmode: 'numeric', placeholder: L.idPlaceholder });
+  const giveVip = () => {
+    const id = Number(idInput.value.trim());
+    if (!Number.isSafeInteger(id) || id <= 0) return toast(L.badId);
+    haptic('medium');
+    act({ action: 'vip', userId: id, on: true });
+  };
+
+  // Рассылка: сервер отправляет порциями, приложение просит следующую, пока не закончится.
+  const bcText = h('textarea', { class: 'field', rows: '4', placeholder: L.bcPlaceholder, maxlength: '3500' });
+  const bcBtn = h('button', { class: 'btn primary', style: 'margin-top:8px; width:100%' }, h('i', { html: icon('megaphone', 17) }), L.bcSend);
+  bcBtn.onclick = () => {
+    const text = bcText.value.trim();
+    if (!text) return;
+    tg.showConfirm(fill(L.bcAsk, { n: t.started }), async (ok) => {
+      if (!ok) return;
+      bcBtn.disabled = true;
+      let sent = 0; let failedCount = 0; let after = 0;
+      try {
+        while (after !== null) {
+          const res = await call('admin', { action: 'broadcast', text, after });
+          sent += res.sent; failedCount += res.failed; after = res.next;
+          toast(fill(L.bcProgress, { s: sent }));
+        }
+        bcText.value = '';
+        tg.showAlert(fill(L.bcDone, { s: sent, f: failedCount }));
+      } catch { tg.showAlert(`${L.error}. ${fill(L.bcDone, { s: sent, f: failedCount })}`); }
+      bcBtn.disabled = false;
+    });
+  };
+
+  const stepRow = (label, n) => h('div', { class: 'step' },
+    h('div', {}, h('span', {}, label), h('b', {}, `${num(n)} · ${t.started ? Math.round((n / t.started) * 100) : 0}%`)),
+    h('div', { class: 'track' }, h('div', { class: 'fill', style: `width:${t.started ? Math.min(100, (n / t.started) * 100) : 0}%` })));
 
   view().replaceChildren(h('div', { class: 'fade' },
     h('div', { class: 'tiles two' },
@@ -831,20 +1135,32 @@ async function showAdmin(input = {}) {
       h('div', { class: 'tile amber' }, h('b', {}, num(t.pro)), h('span', {}, L.aPro)),
       h('div', { class: 'tile violet' }, h('b', {}, `⭐️ ${num(t.stars)}`), h('span', {}, L.aStars))),
     h('div', { class: 'tiles' },
-      h('div', { class: 'tile' }, h('b', {}, num(t.chats)), h('span', {}, L.aChats)),
+      h('div', { class: 'tile violet' }, h('b', {}, num(t.vip)), h('span', {}, L.aVip)),
       h('div', { class: 'tile red' }, h('b', {}, num(t.deleted)), h('span', {}, L.aDeleted)),
       h('div', { class: 'tile amber' }, h('b', {}, num(t.edited)), h('span', {}, L.aEdited))),
+    h('div', { class: 'section' }, L.funnel),
+    h('div', { class: 'card pad funnel' }, stepRow(L.fStarted, t.started), stepRow(L.fConnected, t.everConnected), stepRow(L.fPaid, t.paid)),
     h('div', { class: 'section' }, L.aNew),
     h('div', { class: 'card pad' }, bars(data.days.map((d) => [d.users]), ['blue'], data.days.map((d, i) => (i % 2 ? '' : new Date(d.day * 1000).getUTCDate())))),
+    h('div', { class: 'section' }, L.vipById),
+    h('div', { class: 'card pad' }, h('div', { class: 'inline' }, idInput, h('button', { class: 'btn primary', onclick: giveVip }, L.give)),
+      h('div', { class: 'hint', style: 'margin-top:8px' }, L.vipByIdHint)),
     h('div', { class: 'section' }, `${L.aList} · ${num(t.users)}`),
-    h('div', { class: 'card' }, data.users.map(userRow)),
+    data.users.length > 5 && h('div', { class: 'search' }, h('i', { html: icon('search', 18) }), find),
+    list,
+    h('div', { class: 'section' }, L.bcTitle),
+    h('div', { class: 'card pad' }, bcText, bcBtn, h('div', { class: 'hint', style: 'margin-top:8px' }, L.bcHint)),
     h('div', { class: 'section' }, L.aPays),
     h('div', { class: 'card' }, data.payments.length
       ? data.payments.map((p) => h('div', { class: 'kv' }, h('span', {}, `ID ${p.userId} · ${stamp(p.at)}`), h('b', {}, `⭐️ ${num(p.stars)}`)))
       : h('div', { class: 'pad hint' }, L.aNoPays)),
-    h('div', { class: 'card' }, h('div', { class: 'kv' }, h('span', {}, L.aMsgs), h('b', {}, num(t.msgs)))),
+    h('div', { class: 'card' },
+      h('div', { class: 'kv' }, h('span', {}, L.aChats), h('b', {}, num(t.chats))),
+      h('div', { class: 'kv' }, h('span', {}, L.aMsgs), h('b', {}, num(t.msgs))),
+      h('div', { class: 'kv' }, h('span', {}, L.aRefs), h('b', {}, num(t.refs)))),
     h('p', { class: 'hint', style: 'margin:12px 6px; text-align:center' }, L.aNote),
   ));
+  draw();
 }
 
 go('chats');

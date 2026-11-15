@@ -2,9 +2,9 @@
 // Обработчики (handlers) и endpoints не пишут запросы сами, а вызывают функции отсюда.
 
 import { db } from 'sdk';
-import { eq, and, or, asc, desc, inArray, isNotNull, sql } from 'sdk/db';
+import { eq, and, or, gt, asc, desc, inArray, isNotNull, sql } from 'sdk/db';
 import { users, connections, chats, messages, edits, payments } from '../schema.js';
-import { LIMITS } from './config.js';
+import { LIMITS, PRO, OWNER_ID } from './config.js';
 import { pickLang } from './i18n.js';
 
 export const now = () => Math.floor(Date.now() / 1000);
@@ -13,34 +13,104 @@ const DAY = 24 * 60 * 60;
 // ---------- пользователи ----------
 
 // Находит пользователя или создаёт нового (язык берём из его Telegram).
-// Заодно обновляет имя и @username, если они поменялись.
+// Заодно обновляет имя, один раз выдаёт пробный Pro и следит, чтобы у владельца был VIP.
 export async function getUser(tgUser) {
-  const name = displayName(tgUser);
+  const real = Boolean(tgUser.first_name); // настоящие данные из Telegram, а не одна только цифра ID
+  const name = real ? displayName(tgUser) : '';
   const username = tgUser.username ?? '';
-  const found = await db.select().from(users).where(eq(users.id, tgUser.id)).get();
-  if (found) {
-    if (tgUser.first_name && (found.name !== name || found.username !== username)) {
-      await db.update(users).set({ name, username }).where(eq(users.id, tgUser.id)).run();
-      Object.assign(found, { name, username });
-    }
-    return found;
+  let found = await db.select().from(users).where(eq(users.id, tgUser.id)).get();
+  if (!found) {
+    found = {
+      id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0, name, username,
+      notify: 0, favOnly: 0, vip: 0, trial: 0, tz: 300, refBy: null, refDone: 0,
+      digestDay: 0, digestDel: 0, digestEd: 0, created: now(),
+    };
+    await db.insert(users).values(found).onConflictDoNothing({ target: users.id }).run();
   }
-  const row = {
-    id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0,
-    name: tgUser.first_name ? name : '', username, notify: 1, created: now(),
-  };
-  await db.insert(users).values(row).onConflictDoNothing({ target: users.id }).run();
-  return row;
+  const patch = {};
+  if (real && (found.name !== name || found.username !== username)) Object.assign(patch, { name, username });
+  if (real && !found.trial) {
+    patch.trial = 1;
+    // Строку могли создать заранее (например, выдали VIP по ID) — тогда язык ещё не настоящий.
+    if (!found.name) patch.lang = pickLang(tgUser.language_code);
+    patch.proUntil = Math.max(found.proUntil, now() + PRO.trialDays * DAY);
+  }
+  if (found.id === OWNER_ID && !found.vip) patch.vip = 1;
+  if (Object.keys(patch).length) {
+    await db.update(users).set(patch).where(eq(users.id, found.id)).run();
+    Object.assign(found, patch);
+  }
+  return found;
 }
 
-export const isPro = (user) => user.proUntil > now();
+// Pro есть у тех, кто оплатил (или на пробном сроке), и у всех с VIP.
+export const isPro = (user) => Boolean(user.vip) || user.proUntil > now();
+
+// Меняет настройки пользователя: { notify, favOnly, tz, lang }.
+export async function setPrefs(userId, patch) {
+  if (Object.keys(patch).length) await db.update(users).set(patch).where(eq(users.id, userId)).run();
+}
 
 export async function setLang(userId, lang) {
   await db.update(users).set({ lang }).where(eq(users.id, userId)).run();
 }
 
-export async function setNotify(userId, on) {
-  await db.update(users).set({ notify: on ? 1 : 0 }).where(eq(users.id, userId)).run();
+export async function setNotify(userId, mode) {
+  await setPrefs(userId, { notify: Number(mode) || 0 });
+}
+
+// Прибавляет дни Pro к уже оплаченному сроку. Возвращает новую дату окончания.
+export async function addProDays(userId, days) {
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user) return null;
+  const proUntil = Math.max(now(), user.proUntil) + Math.floor(days) * DAY;
+  await db.update(users).set({ proUntil }).where(eq(users.id, userId)).run();
+  return proUntil;
+}
+
+// ---------- приглашения ----------
+
+// Запоминает, кто пригласил пользователя. Только один раз и только до подключения бота.
+export async function setReferrer(user, refId) {
+  if (user.refBy || user.refDone || refId === user.id) return false;
+  if (await hasAnyConnection(user.id)) return false;
+  const inviter = await db.select().from(users).where(eq(users.id, refId)).get();
+  if (!inviter) return false;
+  await setPrefs(user.id, { refBy: refId });
+  user.refBy = refId;
+  return true;
+}
+
+// Приглашённый подключил бота: один раз начисляем награду пригласившему. Возвращает его или null.
+export async function completeReferral(user, days) {
+  if (!user.refBy || user.refDone) return null;
+  await setPrefs(user.id, { refDone: 1 });
+  user.refDone = 1;
+  const until = await addProDays(user.refBy, days);
+  if (!until) return null;
+  return db.select().from(users).where(eq(users.id, user.refBy)).get();
+}
+
+export async function countReferrals(userId) {
+  return db.$count(users, and(eq(users.refBy, userId), eq(users.refDone, 1)));
+}
+
+// ---------- сводка раз в день ----------
+
+// Учитывает событие в дневной сводке. Если это первое событие за новый день,
+// возвращает счётчики прошлого дня (чтобы бот написал одно сообщение), иначе null.
+export async function digestTick(user, field, n = 1) {
+  const day = Math.floor((now() + user.tz * 60) / DAY);
+  const fresh = user.digestDay !== day;
+  const prev = { deleted: user.digestDel, edited: user.digestEd };
+  const next = {
+    digestDay: day,
+    digestDel: (fresh ? 0 : user.digestDel) + (field === 'deleted' ? n : 0),
+    digestEd: (fresh ? 0 : user.digestEd) + (field === 'edited' ? n : 0),
+  };
+  await setPrefs(user.id, next);
+  Object.assign(user, next);
+  return fresh ? prev : null;
 }
 
 // Записывает оплату и включает Pro. Повторное уведомление о том же платеже ничего не меняет.
@@ -73,6 +143,10 @@ export async function hasActiveConnection(userId) {
   const row = await db.select().from(connections)
     .where(and(eq(connections.userId, userId), eq(connections.enabled, 1))).get();
   return Boolean(row);
+}
+
+export async function hasAnyConnection(userId) {
+  return Boolean(await db.select().from(connections).where(eq(connections.userId, userId)).get());
 }
 
 // ---------- сообщения ----------
@@ -110,6 +184,8 @@ export function details(m) {
     if (file.mime_type) meta.mime = file.mime_type;
     if (file.width && file.height) meta.dim = `${file.width}×${file.height}`;
     if (file.emoji) meta.emoji = file.emoji;
+    if (file.thumbnail?.file_id) meta.thumb = file.thumbnail.file_id; // маленькая картинка-превью
+    if (m.sticker) meta.sticker = file.is_video ? 'video' : file.is_animated ? 'animated' : 'static';
     if (file.title || file.performer) meta.title = [file.performer, file.title].filter(Boolean).join(' — ').slice(0, 120);
   }
   const origin = m.forward_origin;
@@ -172,6 +248,10 @@ export async function countEvent(ownerId, chatId, field, n = 1) {
   }
 }
 
+export async function setFav(ownerId, chatId, fav) {
+  await db.update(chats).set({ fav: fav ? 1 : 0 }).where(and(eq(chats.ownerId, ownerId), eq(chats.chatId, chatId))).run();
+}
+
 export async function setMuted(ownerId, chatId, muted) {
   await db.update(chats).set({ muted: muted ? 1 : 0 }).where(and(eq(chats.ownerId, ownerId), eq(chats.chatId, chatId))).run();
 }
@@ -213,10 +293,17 @@ export async function recordEdit(row, m) {
 // ---------- история для мини-приложения ----------
 
 // type: 'deleted' | 'edited' | 'all'; chatId — только один собеседник (или null — все).
-export async function feed(ownerId, { type = 'all', chatId = null, limit }) {
+// q — поиск по тексту сообщения.
+export async function feed(ownerId, { type = 'all', chatId = null, q = '', limit }) {
   const base = [eq(messages.ownerId, ownerId)];
   if (chatId !== null) base.push(eq(messages.chatId, chatId));
-  const pick = (col) => db.select().from(messages).where(and(...base, isNotNull(col))).orderBy(desc(col)).limit(limit).all();
+  // Поиск делаем сами, а не в базе: база не умеет сравнивать русские буквы без учёта регистра.
+  const needle = String(q).trim().toLowerCase().slice(0, 60);
+  const pick = async (col) => {
+    const rows = await db.select().from(messages).where(and(...base, isNotNull(col))).orderBy(desc(col))
+      .limit(needle ? 1000 : limit).all();
+    return needle ? rows.filter((r) => `${r.text}\n${r.fromName}`.toLowerCase().includes(needle)).slice(0, limit) : rows;
+  };
   const eventAt = (r) => Math.max(r.deletedAt ?? 0, r.editedAt ?? 0);
 
   let rows;
@@ -240,6 +327,19 @@ export async function feed(ownerId, { type = 'all', chatId = null, limit }) {
   }));
 }
 
+// Все сохранённые сообщения одного собеседника по порядку — для выгрузки в файл.
+export async function chatHistory(ownerId, chatId, limit) {
+  const rows = await db.select().from(messages)
+    .where(and(eq(messages.ownerId, ownerId), eq(messages.chatId, chatId)))
+    .orderBy(desc(messages.date)).limit(limit).all();
+  rows.reverse();
+  const changed = rows.filter((r) => r.editedAt).map((r) => r.id);
+  const history = changed.length
+    ? await db.select().from(edits).where(inArray(edits.msgId, changed)).orderBy(asc(edits.id)).all()
+    : [];
+  return rows.map((r) => ({ ...r, versions: history.filter((e) => e.msgId === r.id) }));
+}
+
 export async function getOwnMessage(ownerId, id) {
   return db.select().from(messages).where(and(eq(messages.id, id), eq(messages.ownerId, ownerId))).get();
 }
@@ -259,7 +359,7 @@ export async function cleanup() {
   const t = now();
   const proCut = t - LIMITS.proDays * DAY;
   const freeCut = t - LIMITS.freeDays * DAY;
-  const old = sql`date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t}))`;
+  const old = sql`date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t} or vip = 1))`;
   await db.run(sql`delete from edits where at < ${proCut} or msg_id in (select id from messages where ${old})`);
   await db.run(sql`delete from messages where ${old}`);
 }
@@ -272,7 +372,7 @@ export async function stats() {
   return {
     users: await one(sql`select count(*) as n from users`),
     conns: await one(sql`select count(*) as n from connections where enabled = 1`),
-    pro: await one(sql`select count(*) as n from users where pro_until > ${t}`),
+    pro: await one(sql`select count(*) as n from users where pro_until > ${t} or vip = 1`),
     msgs: await one(sql`select count(*) as n from messages`),
     stars: await one(sql`select coalesce(sum(stars), 0) as n from payments`),
   };
@@ -342,6 +442,12 @@ export async function adminOverview() {
     deleted: await one(sql`select coalesce(sum(deleted), 0) as n from chats`),
     edited: await one(sql`select coalesce(sum(edited), 0) as n from chats`),
     payments: await one(sql`select count(*) as n from payments`),
+    vip: await one(sql`select count(*) as n from users where vip = 1`),
+    refs: await one(sql`select count(*) as n from users where ref_done = 1`),
+    // Воронка: сколько людей дошло до каждого шага.
+    started: await one(sql`select count(*) as n from users where name <> ''`),
+    everConnected: await one(sql`select count(distinct user_id) as n from connections`),
+    paid: await one(sql`select count(distinct user_id) as n from payments`),
   };
   const today = Math.floor(t / DAY);
   const days = Array.from({ length: 14 }, (_, i) => ({ day: (today - 13 + i) * DAY, users: 0 }));
@@ -360,8 +466,9 @@ export async function adminOverview() {
   return {
     totals, days,
     users: all.slice(0, 100).map((u) => ({
-      id: u.id, name: u.name, username: u.username, lang: u.lang, created: u.created,
-      proUntil: u.proUntil, pro: u.proUntil > t, connected: active.has(u.id),
+      id: u.id, name: u.name, username: u.username, lang: u.lang, created: u.created, notify: u.notify,
+      proUntil: u.proUntil, pro: isPro(u), vip: Boolean(u.vip), owner: u.id === OWNER_ID,
+      refBy: u.refBy ?? null, connected: active.has(u.id),
       ...(usage.get(u.id) ?? { chats: 0, saved: 0, deleted: 0, edited: 0 }),
     })),
     payments: await db.select().from(payments).orderBy(desc(payments.at)).limit(30).all(),
@@ -375,4 +482,18 @@ export async function adminSetPro(userId, days) {
   const proUntil = days > 0 ? Math.max(now(), user.proUntil) + Math.floor(days) * DAY : 0;
   await db.update(users).set({ proUntil }).where(eq(users.id, userId)).run();
   return { ...user, proUntil };
+}
+
+// Выдаёт или снимает бессрочный VIP. Если человек ещё не запускал бота, создаём для него строку заранее —
+// VIP будет ждать его.
+export async function adminSetVip(userId, on) {
+  const user = await getUser({ id: userId });
+  if (userId === OWNER_ID) return user; // у владельца VIP не снимается
+  await setPrefs(userId, { vip: on ? 1 : 0 });
+  return { ...user, vip: on ? 1 : 0 };
+}
+
+// Порция пользователей для рассылки: те, кто запускал бота, по возрастанию ID после after.
+export async function broadcastBatch(after, limit) {
+  return db.select().from(users).where(and(gt(users.id, after), sql`name <> ''`)).orderBy(asc(users.id)).limit(limit).all();
 }
