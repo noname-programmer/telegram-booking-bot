@@ -193,7 +193,8 @@ The platform manages the bot's webhook for you, derived from your deployed
   (0 quiet — the default for new users, 1 full, 2 short, 3 one message a day); `chats.muted`, `chats.fav` and
   `users.favOnly` narrow it. Handlers always save and count; `announce()` only decides whether to message the owner.
 - Files are never downloaded when a message is saved (only `file_id` is stored). The `media` endpoint is the only place
-  that reads file bytes: keep the size check before reading and the capped streaming loop.
+  that reads file bytes for the Mini App: keep the size check before reading and the capped, chunked streaming loop.
+  `sendAsFile()` in `lib/ui.js` downloads (≤ 20 MB) to re-upload a photo or video as a document. Never resize or re-encode.
 - `whoami(ctx, input)` also enforces the ban and the PIN (`input.pin`): never read user data in an endpoint before it.
 - Admin = `ADMIN_IDS` (owner) or `users.role = 'admin'` (helper): check with `isAdmin(user)`; owner-only actions
   (VIP, broadcast, settings, roles) use `requireOwner`.

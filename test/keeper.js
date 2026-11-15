@@ -716,7 +716,7 @@ await step('С Pro: фото и голосовое открываются пря
   const { items } = await feedEndpoint({ type: 'deleted' }, ctx(OWNER));
   const voice = items.find((i) => i.kind === 'voice');
   const photo = items.find((i) => i.kind === 'photo');
-  assert.deepEqual(await mediaEndpoint({ id: voice.id }, ctx(OWNER)), { mime: 'audio/ogg', data: 'SGkh' });
+  assert.deepEqual(await mediaEndpoint({ id: voice.id }, ctx(OWNER)), { mime: 'audio/ogg', data: 'SGkh', part: 0, parts: 1, size: 3 });
   assert.equal((await mediaEndpoint({ id: photo.id }, ctx(OWNER))).mime, 'image/jpeg');
   assert.equal(sent(take(), 'getFileStream')[0].params, 'voice-1');
   await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OTHER)));        // чужой файл
@@ -725,7 +725,7 @@ await step('С Pro: фото и голосовое открываются пря
   await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)));        // слишком большой
   sqlite.prepare('update messages set meta = null where id = ?').run(voice.id);
   failures.fileSize = LIMITS.inlineMedia + 1;                                     // размер неизвестен заранее, но Telegram говорит: большой
-  await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)), /слишком большой/);
+  await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)), /больше 20 МБ/);
   failures.fileSize = null;
   failures.rule = (method) => (method === 'getFileStream' ? new BotApiError(method, 400, 'file is too old') : undefined);
   await assert.rejects(() => mediaEndpoint({ id: voice.id }, ctx(OWNER)));        // Telegram файл уже не отдаёт
@@ -743,7 +743,7 @@ await step('Документы (PDF, Excel и любые файлы) сохра�
   assert.equal(doc.meta.size, 52_000_000);
   assert.equal(doc.hasThumb, true);
   assert.doesNotMatch(JSON.stringify(doc), /doc-thumb|doc-1/);                    // ссылки на файлы наружу не уходят
-  await assert.rejects(() => mediaEndpoint({ id: doc.id }, ctx(OWNER)), /слишком большой/); // 52 МБ в приложение не качаем
+  await assert.rejects(() => mediaEndpoint({ id: doc.id }, ctx(OWNER)), /больше 20 МБ/); // 52 МБ в приложение не качаем
   assert.equal(sent(take(), 'getFileStream').length, 0);                          // и даже не начинаем
   assert.equal((await mediaEndpoint({ id: doc.id, thumb: true }, ctx(OWNER))).mime, 'image/jpeg');
   await sendMediaEndpoint({ id: doc.id }, ctx(OWNER));                            // а в чат файл приходит любого размера
@@ -765,7 +765,7 @@ await step('При правке заменили файл → прежний ф�
   assert.equal((await mediaEndpoint({ id: item.id, edit: v.id }, ctx(OWNER))).mime, 'image/jpeg');
   assert.equal(sent(take(), 'getFileStream')[0].params, 'old-photo');
   await sendMediaEndpoint({ id: item.id, edit: v.id }, ctx(OWNER));
-  assert.equal(sent(take(), 'sendPhoto')[0].params.photo, 'old-photo');
+  assert.equal(sent(take(), 'sendDocument')[0].params.document.name.endsWith('.jpg'), true);     // прежнее фото — тоже файлом
   await assert.rejects(() => mediaEndpoint({ id: item.id, edit: 999999 }, ctx(OWNER)));
   givePro(OTHER);
   await assert.rejects(() => mediaEndpoint({ id: item.id, edit: v.id }, ctx(OTHER))); // чужая правка
@@ -783,6 +783,68 @@ await step('Часы Telegram спешат → «удалено» не рань�
   const item = items.find((i) => i.text === 'из будущего');
   assert.ok(item.deletedAt >= item.date);
   sqlite.prepare('delete from messages where message_id = ?').run(m.message_id);
+});
+
+await step('Качество: из размеров фото берём самый большой; файл едет в приложение частями и без изменений', async () => {
+  // Размеры пришли в необычном порядке — всё равно должен выбраться самый большой.
+  const m = biz({ photo: [{ file_id: 'q-hd', width: 2560, height: 1440, file_size: 900_000 }, { file_id: 'q-s', width: 90, height: 50, file_size: 2000 },
+    { file_id: 'q-m', width: 320, height: 180, file_size: 20_000 }] });
+  await onBizMessage(m);
+  await del([m.message_id]);
+  take();
+  const { items } = await feedEndpoint({ type: 'deleted', chatId: FRIEND }, ctx(OWNER));
+  const photo = items.find((i) => i.meta?.dim === '2560×1440');
+  assert.equal(photo.meta.size, 900_000);
+  await mediaEndpoint({ id: photo.id }, ctx(OWNER));
+  assert.equal(sent(take(), 'getFileStream')[0].params, 'q-hd');
+  // Части: файл «Hi!» (3 байта) режем по 2 байта → две части, вместе дают исходные байты.
+  const chunk = LIMITS.mediaChunk;
+  LIMITS.mediaChunk = 2;
+  const a = await mediaEndpoint({ id: photo.id }, ctx(OWNER));
+  const b = await mediaEndpoint({ id: photo.id, part: 1 }, ctx(OWNER));
+  const c = await mediaEndpoint({ id: photo.id, part: 5 }, ctx(OWNER));
+  LIMITS.mediaChunk = chunk;
+  assert.deepEqual([a.parts, a.size, a.part, b.part], [2, 3, 0, 1]);
+  assert.equal(Buffer.concat([Buffer.from(a.data, 'base64'), Buffer.from(b.data, 'base64')]).toString(), 'Hi!');
+  assert.equal(c.data, '');                                                                          // части за концом файла пустые
+  take();
+  sqlite.prepare("delete from messages where file_id = 'q-hd'").run();
+});
+
+await step('«Получить файл»: фото и видео приходят файлом без сжатия; большие и при сбое — обычной пересылкой', async () => {
+  const add = async (extra) => { const m = biz(extra); await onBizMessage(m); await del([m.message_id]); take(); return m; };
+  const find = async (fileKind) => (await feedEndpoint({ type: 'deleted', chatId: FRIEND }, ctx(OWNER))).items.filter((i) => i.kind === fileKind).at(0);
+  const p = await add({ photo: [{ file_id: 'f-photo', width: 1280, height: 720, file_size: 500_000 }] });
+  const res = await sendMediaEndpoint({ id: (await find('photo')).id }, ctx(OWNER));
+  let out = take();
+  assert.equal(res.asFile, true);
+  assert.match(res.message, /без сжатия/);
+  assert.equal(sent(out, 'sendPhoto').length, 0);                                                    // не «как фото»
+  const doc = sent(out, 'sendDocument')[0].params;
+  assert.equal(doc.chat_id, OWNER);
+  assert.equal(doc.disable_content_type_detection, true);
+  assert.match(doc.document.name, /^photo_\d{8}_\d{4}\.jpg$/);
+  assert.equal(Buffer.from(doc.document.bytes).toString(), 'Hi!');                                   // те же байты, что отдал Telegram
+  // Видео: имя и тип берём из самого файла.
+  await add({ video: { file_id: 'f-video', file_name: 'IMG_0042.MOV', mime_type: 'video/quicktime', file_size: 9_000_000 } });
+  await sendMediaEndpoint({ id: (await find('video')).id }, ctx(OWNER));
+  const vid = sent(take(), 'sendDocument')[0].params.document;
+  assert.deepEqual([vid.name, vid.options.type], ['IMG_0042.MOV', 'video/quicktime']);
+  // Больше 20 МБ скачать нельзя → пересылаем по ссылке как видео (качество то же).
+  await add({ video: { file_id: 'f-big', file_size: LIMITS.asFileMax + 1 } });
+  const big = await sendMediaEndpoint({ id: (await find('video')).id }, ctx(OWNER));
+  out = take();
+  assert.equal(big.asFile, false);
+  assert.equal(sent(out, 'getFileContent').length, 0);
+  assert.equal(sent(out, 'sendVideo')[0].params.video, 'f-big');
+  // Скачать не вышло → тоже обычная пересылка, а не ошибка.
+  failures.rule = (method) => (method === 'getFileContent' ? new BotApiError(method, 400, 'file is too big') : undefined);
+  const fallback = await sendMediaEndpoint({ id: (await find('photo')).id }, ctx(OWNER));
+  failures.rule = null;
+  assert.equal(fallback.asFile, false);
+  assert.equal(sent(take(), 'sendPhoto')[0].params.photo, 'f-photo');
+  sqlite.prepare("delete from messages where file_id like 'f-%'").run();
+  assert.ok(p);
 });
 
 await step('С Pro: выгрузка переписки с собеседником приходит файлом', async () => {

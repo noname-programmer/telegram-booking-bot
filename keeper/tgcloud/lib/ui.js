@@ -3,7 +3,7 @@
 //   pro | lang | lang:<код> | notify | privacy | wipe:ask | wipe:yes | wipe:no
 // Кнопка notify переключает режим уведомлений по кругу: тихо → коротко → сводка → полностью.
 
-import { api, BotApiError } from 'sdk';
+import { api, BotApiError, InputFile } from 'sdk';
 import { BOT_NAME, MINIAPP_URL, PRO, LIMITS, NOTIFY, OWNER_ID } from './config.js';
 import { t, LANGS } from './i18n.js';
 import { isPro, hasActiveConnection, digestTick, weeklyTick, clearVault } from './store.js';
@@ -160,6 +160,39 @@ export async function weeklyReport(user, chatId) {
   if (data.top.length) lines.push('', t(lang, 'weekTop'), ...data.top.map(([name, n], i) => `${['🥇', '🥈', '🥉'][i]} ${esc(name)} — ${n}`));
   if (data.hour !== null) lines.push('', t(lang, 'weekHour', { from: String(data.hour).padStart(2, '0'), to: String((data.hour + 1) % 24).padStart(2, '0') }));
   await send(chatId, lines.join('\n'), openButton(lang));
+}
+
+// Фото и видео, которые по ссылке Telegram отправляются «как фото/видео». Чтобы получить именно файл
+// (его можно сохранить в исходном виде, Telegram его не пережимает), бот скачивает его и отправляет документом.
+const AS_FILE = { photo: ['jpg', 'image/jpeg'], video: ['mp4', 'video/mp4'], video_note: ['mp4', 'video/mp4'], animation: ['mp4', 'video/mp4'] };
+export const canSendAsFile = (kind) => Boolean(AS_FILE[kind]);
+
+export function fileName(kind, date, meta = {}) {
+  if (meta.fileName) return meta.fileName;
+  const [ext] = AS_FILE[kind] ?? ['bin'];
+  const stamp = new Date((date ?? 0) * 1000).toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '_');
+  const fromMime = { 'video/quicktime': 'mov', 'video/webm': 'webm', 'image/png': 'png', 'image/webp': 'webp' }[meta.mime];
+  return `${kind}_${stamp}.${fromMime ?? ext}`;
+}
+
+// Отправляет фото или видео файлом без сжатия. Возвращает false, если не получилось
+// (тогда вызывающий код отправит обычным способом — качество то же, но это будет «фото», а не «файл»).
+export async function sendAsFile(chatId, file, date) {
+  const meta = file.meta ?? {};
+  if (!canSendAsFile(file.kind) || (meta.size ?? 0) > LIMITS.asFileMax) return false;
+  try {
+    const bytes = await api.getFileContent(file.fileId);
+    if (bytes.length > LIMITS.asFileMax) return false;
+    await api.sendDocument({
+      chat_id: chatId,
+      document: new InputFile(bytes, fileName(file.kind, date, meta), { type: meta.mime ?? AS_FILE[file.kind][1] }),
+      disable_content_type_detection: true, // иначе Telegram сам превратит файл обратно в «видео» или GIF
+    });
+    return true;
+  } catch (e) {
+    if (e instanceof BotApiError) return false;
+    throw e;
+  }
 }
 
 // Текст о сообщении: вид (если это не просто текст) и содержимое.

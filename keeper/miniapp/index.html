@@ -380,7 +380,7 @@ const TEXTS = {
     shareBtn: 'Поделиться', copy: 'Скопировать', copied: 'Ссылка скопирована', shareText: 'Keeper показывает сообщения, которые собеседник удалил или изменил',
     fav: 'В избранное', unfav: 'В избранном', exportBtn: 'Выгрузить переписку в файл', exporting: 'Готовлю файл…',
     searchText: 'Поиск по тексту и имени', notFound: 'Ничего не найдено',
-    listen: 'Прослушать', watch: 'Смотреть', loadingMedia: 'Загружаю…', mediaErr: 'Не удалось показать. Попробуйте «Прислать файл в чат».',
+    listen: 'Прослушать', watch: 'Смотреть', loadingMedia: 'Загружаю…', mediaErr: 'Не удалось показать. Нажмите «Получить файлом» — он придёт в чат.',
     toChat: 'Прислать файл в чат',
     funnel: 'Путь пользователя', fStarted: 'Запустили бота', fConnected: 'Подключили к аккаунту', fPaid: 'Оплатили Pro',
     aVip: 'VIP', aRefs: 'Приглашений', aGiveVip: '💎 Выдать бессрочный VIP', aTakeVip: 'Снять VIP',
@@ -391,7 +391,7 @@ const TEXTS = {
     findUser: 'Поиск по имени или ID', aOwner: 'ВЛАДЕЛЕЦ', close: 'Закрыть',
     theme: 'Оформление', themes: ['Как в Telegram', 'Светлая', 'Тёмная'],
     history: 'История правок', vWas: 'Было', vNow: 'Сейчас', vStep: 'Версия {n}', oldFile: 'Показать прежний файл', oldFileChat: 'Прежний файл — в чат',
-    getFile: 'Получить файл в чате', bigFile: 'Большой файл: откроется в чате с ботом',
+    getFile: 'Получить файлом, без сжатия', bigFile: 'Большой файл: откроется в чате с ботом',
     fMedia: '🖼 Медиа', fKept: '⭐ Закладки', keptOn: 'Добавлено в закладки — не сотрётся по сроку', keptOff: 'Убрано из закладок',
     emptyKept: 'Закладок нет', emptyKeptHint: 'Нажмите ☆ на сообщении — оно сохранится, даже когда выйдет срок хранения.',
     emptyMedia: 'Фото и видео нет', emptyMediaHint: 'Здесь появятся удалённые фото, видео и кружки.',
@@ -468,7 +468,7 @@ const TEXTS = {
     findUser: "Ism yoki ID bo'yicha qidirish", aOwner: 'EGASI', close: 'Yopish',
     theme: "Ko'rinish", themes: ['Telegramdagidek', "Yorug'", "Qorong'i"],
     history: 'Tahrirlar tarixi', vWas: 'Avval', vNow: 'Hozir', vStep: '{n}-versiya', oldFile: "Avvalgi faylni ko'rsatish", oldFileChat: 'Avvalgi fayl — chatga',
-    getFile: 'Faylni chatda olish', bigFile: 'Katta fayl: bot bilan chatda ochiladi',
+    getFile: 'Fayl sifatida olish, siqmasdan', bigFile: 'Katta fayl: bot bilan chatda ochiladi',
     fMedia: '🖼 Media', fKept: "⭐ Xatcho'plar", keptOn: "Xatcho'plarga qo'shildi — muddat tugasa ham o'chmaydi", keptOff: "Xatcho'plardan olib tashlandi",
     emptyKept: "Xatcho'plar yo'q", emptyKeptHint: "Xabardagi ☆ ni bosing — saqlash muddati tugasa ham u saqlanib qoladi.",
     emptyMedia: "Rasm va videolar yo'q", emptyMediaHint: "Bu yerda o'chirilgan rasm, video va dumaloq videolar paydo bo'ladi.",
@@ -545,7 +545,7 @@ const TEXTS = {
     findUser: 'Search by name or ID', aOwner: 'OWNER', close: 'Close',
     theme: 'Appearance', themes: ['Same as Telegram', 'Light', 'Dark'],
     history: 'Edit history', vWas: 'Before', vNow: 'Now', vStep: 'Version {n}', oldFile: 'Show the previous file', oldFileChat: 'Previous file — to chat',
-    getFile: 'Get the file in chat', bigFile: 'Large file: it opens in the chat with the bot',
+    getFile: 'Get as a file, uncompressed', bigFile: 'Large file: it opens in the chat with the bot',
     fMedia: '🖼 Media', fKept: '⭐ Bookmarks', keptOn: 'Bookmarked — it will not be erased when storage time runs out', keptOff: 'Removed from bookmarks',
     emptyKept: 'No bookmarks', emptyKeptHint: 'Tap ☆ on a message — it stays even after the storage time runs out.',
     emptyMedia: 'No photos or videos', emptyMediaHint: 'Deleted photos, videos and video messages will appear here.',
@@ -1029,7 +1029,7 @@ function gallery(items) {
       if (!me.pro) return toast(L.fileLocked);
       if (!small) { try { toast((await call('sendMedia', { id: item.id })).message); } catch (err) { tg.showAlert(err.message || L.error); } return; }
       toast(L.loadingMedia);
-      try { const { url } = await mediaUrl(item.id); openViewer({ type: isPhoto ? 'image' : 'video', url, item }); } catch (err) { tg.showAlert(err.message || L.mediaErr); }
+      try { const { url } = await mediaUrl(item.id, false, null, (share) => { if (share < 1) toast(percent(share)); }); openViewer({ type: isPhoto ? 'image' : 'video', url, item }); } catch (err) { tg.showAlert(err.message || L.mediaErr); }
     };
     return cell;
   }));
@@ -1170,18 +1170,33 @@ function eventCard(item, withName) {
 
 // ---------- показ фото, видео и голосовых прямо в приложении ----------
 const mediaCache = new Map(); // чтобы не скачивать один файл дважды
-async function mediaUrl(id, thumb = false, edit = null) {
+// Файл приходит с сервера частями (так большой файл не «подвешивает» запрос) и склеивается здесь без изменений —
+// то есть в том же качестве, в каком его отдал Telegram. onProgress(доля) вызывается после каждой части.
+const mediaWatchers = new Map();
+async function mediaUrl(id, thumb = false, edit = null, onProgress = null) {
   const key = `${id}:${thumb}:${edit}`;
+  if (onProgress) mediaWatchers.set(key, onProgress);
   if (!mediaCache.has(key)) {
-    mediaCache.set(key, call('media', { id, thumb, edit }).then((res) => {
-      const raw = atob(res.data);
-      const bytes = new Uint8Array(raw.length);
-      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-      return { url: URL.createObjectURL(new Blob([bytes], { type: res.mime })), mime: res.mime };
-    }).catch((err) => { mediaCache.delete(key); throw err; }));
+    const load = async () => {
+      const chunks = [];
+      let parts = 1; let mime = '';
+      for (let part = 0; part < parts; part++) {
+        const res = await call('media', { id, thumb, edit, part });
+        const raw = atob(res.data);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        chunks.push(bytes);
+        parts = Math.min(res.parts || 1, 64);
+        mime = res.mime;
+        mediaWatchers.get(key)?.((part + 1) / parts);
+      }
+      return { url: URL.createObjectURL(new Blob(chunks, { type: mime })), mime };
+    };
+    mediaCache.set(key, load().catch((err) => { mediaCache.delete(key); throw err; }).finally(() => mediaWatchers.delete(key)));
   }
   return mediaCache.get(key);
 }
+const percent = (share) => `${L.loadingMedia} ${Math.round(share * 100)}%`;
 // Загружает картинку, только когда карточка появилась на экране.
 const lazy = new IntersectionObserver((entries) => {
   for (const e of entries) if (e.isIntersecting) { lazy.unobserve(e.target); e.target.load(); }
@@ -1294,13 +1309,15 @@ function mediaBox(item) {
   if (big || !(isImage || isVideo || isAudio)) return fileCard(item, L.kinds[kind] || L.kinds.other);
 
   const box = h('div', { class: `media${kind === 'video_note' ? ' round' : ''}${kind === 'sticker' ? ' sticker' : ''}` });
-  const wait = () => box.replaceChildren(h('div', { class: 'wait' }, L.loadingMedia));
+  const note = h('div', { class: 'wait' }, L.loadingMedia);
+  const wait = () => { note.textContent = L.loadingMedia; box.replaceChildren(note); };
+  const progress = (share) => { if (share < 1) note.textContent = percent(share); };
   const fail = (err) => box.replaceChildren(h('div', { class: 'wait' }, err?.message && err.type === 'ENDPOINT_ERROR' ? err.message : L.mediaErr));
   const inline = kind === 'sticker' || kind === 'animation'; // стикеры и GIF играют прямо в карточке
 
   if (isImage) {
     wait();
-    box.load = () => mediaUrl(item.id).then(({ url }) => {
+    box.load = () => mediaUrl(item.id, false, null, progress).then(({ url }) => {
       const img = h('img', { src: url, alt: '' });
       if (kind !== 'sticker') img.onclick = () => { haptic(); openViewer({ type: 'image', url, item }); };
       box.replaceChildren(img);
@@ -1313,7 +1330,7 @@ function mediaBox(item) {
     button.onclick = () => {
       haptic();
       wait();
-      mediaUrl(item.id).then(({ url }) => {
+      mediaUrl(item.id, false, null, progress).then(({ url }) => {
         if (!inline) { restore(); return openViewer({ type: 'video', url, item }); }
         const video = h('video', { src: url, autoplay: '', playsinline: '', loop: '' });
         video.muted = true;
@@ -1335,7 +1352,7 @@ function mediaBox(item) {
     box.append(h('button', { class: 'listen', onclick: () => {
       haptic();
       wait();
-      mediaUrl(item.id).then(({ url }) => {
+      mediaUrl(item.id, false, null, progress).then(({ url }) => {
         const audio = h('audio', { src: url, controls: '', autoplay: '' });
         audio.onerror = () => fail();
         box.replaceChildren(audio);

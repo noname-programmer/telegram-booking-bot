@@ -334,11 +334,15 @@ export async function hasAnyConnection(userId) {
 
 const MEDIA = ['video', 'video_note', 'voice', 'audio', 'document', 'animation', 'sticker'];
 
+// Telegram присылает фото сразу в нескольких размерах. Берём самый большой — это лучшее качество, какое есть.
+const area = (p) => (p.width ?? 0) * (p.height ?? 0);
+export const bestPhoto = (sizes) => sizes.reduce((best, p) => ((p.file_size ?? 0) > (best.file_size ?? 0) || area(p) > area(best) ? p : best), sizes[0]);
+
 // Что это за сообщение: вид, текст и ссылка на файл.
 export function describe(m) {
   if (typeof m.text === 'string') return { kind: 'text', text: m.text, fileId: null };
   const text = m.caption ?? '';
-  if (Array.isArray(m.photo) && m.photo.length) return { kind: 'photo', text, fileId: m.photo.at(-1).file_id };
+  if (Array.isArray(m.photo) && m.photo.length) return { kind: 'photo', text, fileId: bestPhoto(m.photo).file_id };
   // GIF приходит сразу как animation и document — проверяем animation раньше.
   if (m.animation) return { kind: 'animation', text, fileId: m.animation.file_id };
   for (const kind of MEDIA) {
@@ -357,7 +361,7 @@ export function describe(m) {
 // Возвращает строку JSON или null, если добавить нечего.
 export function details(m) {
   const meta = {};
-  const file = (Array.isArray(m.photo) && m.photo.at(-1)) || m.animation || MEDIA.map((k) => m[k]).find(Boolean);
+  const file = (Array.isArray(m.photo) && m.photo.length && bestPhoto(m.photo)) || m.animation || MEDIA.map((k) => m[k]).find(Boolean);
   if (file) {
     if (file.file_size) meta.size = file.file_size;
     if (file.duration) meta.duration = file.duration;
