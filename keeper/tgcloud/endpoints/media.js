@@ -1,12 +1,13 @@
 // endpoints/media.js — отдаёт сохранённое фото, видео или голосовое прямо в мини-приложение,
 // чтобы его можно было посмотреть там, а не в чате. Только для Pro и VIP.
-//   { id }               — сам файл (если он не больше LIMITS.inlineMedia)
-//   { id, thumb: true }  — маленькое превью (для видео и файлов)
+//   { id }               — сам файл, в исходном виде, без сжатия
+//   { id, part: 2 }      — третья часть большого файла (части считаются с нуля)
+//   { id, thumb: true }  — маленькое превью (для галереи, видео и файлов)
 //   { id, edit }         — прежний файл, который заменили при правке (edit — номер правки)
 //
-// Большой файл сюда не попадает: сначала спрашиваем у Telegram размер, и только потом качаем,
-// причём по кусочкам и с остановкой, если кусочков набралось больше лимита. Так endpoint не «зависнет»
-// и не займёт память, даже если пришлют файл на сотни мегабайт.
+// Файл едет частями по LIMITS.mediaChunk: ответ всегда небольшой, а приложение склеивает части обратно.
+// Сначала спрашиваем у Telegram размер; читаем по кусочкам и останавливаемся, как только набрали нужную часть.
+// Поэтому даже очень большой файл не «подвесит» endpoint и не займёт память.
 
 import { api, BotApiError, EndpointError } from 'sdk';
 import { LIMITS } from '../lib/config.js';
@@ -33,23 +34,36 @@ export default async function (input, ctx) {
   if (!fileId) throw gone('NOT_FOUND');
   if (!input.thumb && (meta.size ?? 0) > LIMITS.inlineMedia) throw tooBig();
 
-  const chunks = [];
-  let total = 0;
+  const chunk = LIMITS.mediaChunk;
+  const part = Number.isInteger(input.part) && input.part > 0 ? input.part : 0;
+  const from = part * chunk;      // с какого байта начинается нужная часть
+  const to = from + chunk;        // и на каком заканчивается
+  const pieces = [];
+  let seen = 0;                   // сколько байт файла уже прошло мимо нас
+  let size = 0;                   // полный размер файла
   try {
     const stream = await api.getFileStream(fileId);
-    if ((stream.file?.file_size ?? 0) > LIMITS.inlineMedia) throw tooBig();
-    for await (const chunk of stream.body) {
-      total += chunk.length;
-      if (total > LIMITS.inlineMedia) throw tooBig();
-      chunks.push(chunk);
+    size = stream.file?.file_size ?? 0;
+    if (size > LIMITS.inlineMedia) throw tooBig();
+    for await (const bytes of stream.body) {
+      const start = seen;
+      seen += bytes.length;
+      if (seen > LIMITS.inlineMedia) throw tooBig();
+      // Берём из кусочка только то, что попадает в нужную часть.
+      if (seen > from && start < to) pieces.push(bytes.subarray(Math.max(0, from - start), Math.min(bytes.length, to - start)));
+      if (seen >= to && size) break; // нужная часть набрана, полный размер известен — дальше можно не читать
     }
   } catch (e) {
     // Telegram хранит файлы не вечно, а файлы больше 20 МБ боту не отдаёт вовсе.
     if (e instanceof BotApiError) throw gone('FILE_GONE');
     throw e;
   }
-  const bytes = new Uint8Array(total);
+  if (!size) size = seen; // Telegram не сказал размер заранее — значит, мы дочитали файл до конца и знаем его
+  const out = new Uint8Array(pieces.reduce((n, p) => n + p.length, 0));
   let at = 0;
-  for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.length; }
-  return { mime: input.thumb ? 'image/jpeg' : mimeOf({ kind: file.kind }, meta), data: base64(bytes) };
+  for (const p of pieces) { out.set(p, at); at += p.length; }
+  return {
+    mime: input.thumb ? 'image/jpeg' : mimeOf({ kind: file.kind }, meta),
+    data: base64(out), part, parts: Math.max(1, Math.ceil(size / chunk)), size,
+  };
 }

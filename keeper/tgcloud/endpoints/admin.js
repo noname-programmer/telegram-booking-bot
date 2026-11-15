@@ -8,14 +8,15 @@
 //   { action: 'role', userId, on }             — назначить или снять помощника (второго админа)
 //   { action: 'promoAdd', code, days, uses }   — создать промокод;  { action: 'promoDel', code } — удалить
 //   { action: 'settings', values: {…} }        — цена и лимиты (см. TUNABLE в lib/store.js)
+//   { action: 'refPrize' }                     — наградить три первых места рейтинга приглашений (REF.prizes)
 // Помощнику доступно всё, кроме VIP, рассылки, настроек и назначения помощников — это только владельцу.
 
 import { EndpointError } from 'sdk';
-import { LIMITS } from '../lib/config.js';
+import { LIMITS, REF } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
 import {
   adminOverview, adminSetPro, adminSetVip, adminSetBanned, adminSetRole, broadcastBatch,
-  createPromo, deletePromo, saveSettings,
+  createPromo, deletePromo, saveSettings, refTop, addProDays, getUser,
 } from '../lib/store.js';
 import { send, esc } from '../lib/ui.js';
 import { whoami, requireAdmin, requireOwner } from '../lib/app.js';
@@ -46,6 +47,16 @@ export default async function (input, ctx) {
   if (input.action === 'settings') {
     requireOwner(user);
     if (!(await saveSettings(input.values ?? {}))) throw bad('BAD_INPUT');
+  }
+
+  if (input.action === 'refPrize') {
+    requireOwner(user);
+    const winners = await refTop(REF.prizes.length);
+    for (const [i, w] of winners.entries()) {
+      await addProDays(w.id, REF.prizes[i]);
+      const lang = (await getUser({ id: w.id })).lang;
+      await send(w.id, t(lang, 'prizeGot', { place: i + 1, days: REF.prizes[i] }));
+    }
   }
 
   if (input.action === 'vip') {

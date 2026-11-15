@@ -4,8 +4,10 @@
 import { api } from 'sdk';
 import { ADMIN_IDS, PRO } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
-import { getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo } from '../lib/store.js';
-import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate } from '../lib/ui.js';
+import {
+  getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo, recordPayment, addProDays,
+} from '../lib/store.js';
+import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate, esc, proReminder } from '../lib/ui.js';
 
 export default async function onMessage(message) {
   if (message.chat?.type !== 'private' || !message.from) return;
@@ -16,6 +18,22 @@ export default async function onMessage(message) {
   // Оплата прошла (первая или автоматическое продление): включаем Pro.
   const pay = message.successful_payment;
   if (pay) {
+    const charge = pay.telegram_payment_charge_id;
+    // Год со скидкой: разовая оплата, дни прибавляются к уже оплаченному сроку.
+    if (pay.invoice_payload === 'year') {
+      if (!(await recordPayment(charge, user.id, pay.total_amount))) return;
+      const date = await addProDays(user.id, PRO.yearDays);
+      return send(chatId, t(lang, 'proThanks', { date: fmtDate(date) }));
+    }
+    // Подарок другу: Pro получает не тот, кто платил.
+    const gift = /^gift:(\d+)$/.exec(pay.invoice_payload ?? '');
+    if (gift) {
+      if (!(await recordPayment(charge, user.id, pay.total_amount))) return;
+      const friend = await getUser({ id: Number(gift[1]) });
+      const date = await addProDays(friend.id, PRO.giftDays);
+      await send(friend.id, t(friend.lang, 'giftGot', { name: esc(user.name || '?'), days: PRO.giftDays, date: fmtDate(date) }));
+      return send(chatId, t(lang, 'giftSent', { name: esc(friend.name || String(friend.id)), days: PRO.giftDays }));
+    }
     if (pay.invoice_payload !== 'pro') return;
     const until = pay.subscription_expiration_date ?? now() + PRO.periodSeconds;
     const fresh = await grantPro(user.id, until, pay.telegram_payment_charge_id, pay.total_amount);
@@ -62,7 +80,9 @@ export default async function onMessage(message) {
 
   // /start, /help и любой другой текст — главное меню.
   const me = await api.getMe();
-  return send(chatId, ...split(await menu(user, me.username)));
+  await send(chatId, ...split(await menu(user, me.username)));
+  // Если Pro заканчивается завтра — напоминаем (один раз на каждый срок).
+  return proReminder(user, chatId);
 }
 
 // { text, reply_markup } → аргументы для send(chatId, text, extra)

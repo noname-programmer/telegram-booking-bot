@@ -4,7 +4,7 @@
 //   chatId: показать только одного собеседника (не обязательно)
 //   q:      поиск по тексту (не обязательно)
 
-import { feed } from '../lib/store.js';
+import { feed, chatNames } from '../lib/store.js';
 import { whoami, toItem } from '../lib/app.js';
 
 export default async function (input, ctx) {
@@ -14,5 +14,7 @@ export default async function (input, ctx) {
     ? Number(input.chatId) : null;
   const q = typeof input.q === 'string' ? input.q : '';
   const rows = await feed(user.id, { type, chatId, q, limit });
-  return { ...profile, items: rows.map(toItem) };
+  // На странице собеседника заодно отдаём его прежние имена.
+  const names = chatId === null ? [] : (await chatNames(user.id, chatId)).map((n) => ({ name: n.name, username: n.username, at: n.at }));
+  return { ...profile, items: rows.map(toItem), names };
 }

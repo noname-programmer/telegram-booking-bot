@@ -26,6 +26,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   timeline with word-level highlighting, file cards for documents. A file replaced by an edit is kept
   (`edits.old_file_id`). The `media` endpoint reads files as a stream with a size cap. "Deleted" time can no longer be
   earlier than "sent".
+- Keeper: best quality everywhere. The largest photo size is picked by size, not by position; the Mini App loads files
+  up to 20 MB in 1 MB parts and shows them unmodified; "Get as a file" sends photos and videos as uncompressed
+  documents (falls back to re-sending by `file_id`).
+- Keeper: swipe between photos and videos in the viewer, history of a person's previous names, a "chat cleared" alert,
+  a reminder a day before Pro ends, a yearly plan (one-time payment), gifting Pro to a friend, export of all chats,
+  an invite ranking with owner-awarded prizes, and a home-screen shortcut. Fixed: swipe-down to close the photo
+  viewer did not work.
 - Keeper: a "safe" channel that receives copies of deleted files (`my_chat_member` handler), a media gallery,
   bookmarks that survive retention, a server-checked PIN for the Mini App, promo codes, price and limits editable
   from the admin panel (`settings` table), user blocking, a weekly report and a helper admin role without VIP rights.

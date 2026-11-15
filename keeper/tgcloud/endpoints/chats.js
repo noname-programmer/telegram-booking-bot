@@ -14,7 +14,7 @@ export default async function (input, ctx) {
     ...profile,
     chats: rows.map((c) => ({
       chatId: c.chatId, name: c.name, username: c.username, saved: c.saved, deleted: c.deleted, edited: c.edited,
-      muted: Boolean(c.muted), fav: Boolean(c.fav), firstAt: c.firstAt, lastAt: c.lastAt, eventAt: c.eventAt,
+      muted: Boolean(c.muted), fav: Boolean(c.fav), renamedAt: c.renamedAt, firstAt: c.firstAt, lastAt: c.lastAt, eventAt: c.eventAt,
     })),
   };
 }

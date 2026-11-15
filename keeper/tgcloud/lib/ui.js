@@ -3,10 +3,10 @@
 //   pro | lang | lang:<код> | notify | privacy | wipe:ask | wipe:yes | wipe:no
 // Кнопка notify переключает режим уведомлений по кругу: тихо → коротко → сводка → полностью.
 
-import { api, BotApiError } from 'sdk';
+import { api, BotApiError, InputFile } from 'sdk';
 import { BOT_NAME, MINIAPP_URL, PRO, LIMITS, NOTIFY, OWNER_ID } from './config.js';
 import { t, LANGS } from './i18n.js';
-import { isPro, hasActiveConnection, digestTick, weeklyTick, clearVault } from './store.js';
+import { isPro, hasActiveConnection, digestTick, weeklyTick, clearVault, proEndsSoon } from './store.js';
 
 // Экранирует текст пользователя, чтобы он не сломал HTML-разметку.
 export const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -84,9 +84,23 @@ export function wipeConfirm(lang) {
   };
 }
 
-// Ссылка на оплату подписки звёздами (её же открывает мини-приложение).
-export function invoiceLink(lang) {
-  const vars = { stars: PRO.stars, freeDays: LIMITS.freeDays, proDays: LIMITS.proDays };
+// Ссылка на оплату звёздами (её же открывает мини-приложение).
+//   plan 'month' — подписка с автопродлением раз в 30 дней
+//   plan 'year'  — разовая оплата на год со скидкой (payload 'year')
+//   plan 'gift'  — месяц Pro в подарок пользователю giftTo (payload 'gift:<ID>')
+export function invoiceLink(lang, plan = 'month', giftTo = null) {
+  const vars = { stars: PRO.stars, freeDays: LIMITS.freeDays, proDays: LIMITS.proDays, days: plan === 'year' ? PRO.yearDays : PRO.giftDays };
+  if (plan === 'year' || plan === 'gift') {
+    const title = t(lang, plan === 'year' ? 'yearTitle' : 'giftTitle');
+    return api.createInvoiceLink({
+      title,
+      description: t(lang, plan === 'year' ? 'yearDesc' : 'giftDesc', vars),
+      payload: plan === 'year' ? 'year' : `gift:${giftTo}`,
+      provider_token: '',
+      currency: 'XTR',
+      prices: [{ label: title, amount: plan === 'year' ? PRO.yearStars : PRO.stars }],
+    });
+  }
   return api.createInvoiceLink({
     title: t(lang, 'proTitle'),
     description: t(lang, 'proDesc', vars),
@@ -105,7 +119,11 @@ export async function proScreen(user) {
   const about = t(lang, 'proAbout', vars);
   if (isPro(user)) return { text: `${about}\n\n${planLine(user)}` };
   const url = await invoiceLink(lang);
-  return { text: about, reply_markup: { inline_keyboard: [[{ text: t(lang, 'btnPay', vars), url }]] } };
+  const yearUrl = await invoiceLink(lang, 'year');
+  return { text: about, reply_markup: { inline_keyboard: [
+    [{ text: t(lang, 'btnPay', vars), url }],
+    [{ text: t(lang, 'btnPayYear', { stars: PRO.yearStars }), url: yearUrl }],
+  ] } };
 }
 
 // ---------- уведомления об удалённых и изменённых сообщениях ----------
@@ -150,6 +168,24 @@ export async function vaultCopy(user, row, fileId = row.fileId, kind = row.kind)
   }
 }
 
+// Тревога «чат очищен»: собеседник (или вы сами) разом удалил много сообщений. Приходит и в тихом режиме,
+// если пользователь не выключил её в профиле и не отключил звук у этого собеседника.
+export async function clearAlert(user, chatId, peer, name, count) {
+  if (!user.alertClear || peer?.muted || count < LIMITS.clearAlert) return false;
+  await send(chatId, t(user.lang, 'clearAlert', { name: esc(name), n: count }), openButton(user.lang));
+  return true;
+}
+
+// Напоминание за сутки до окончания Pro (пробного, по промокоду, подарочного или годового).
+export async function proReminder(user, chatId) {
+  if (!(await proEndsSoon(user))) return;
+  const lang = user.lang;
+  const url = await invoiceLink(lang);
+  await send(chatId, t(lang, 'proEnds', { date: fmtDate(user.proUntil) }), {
+    reply_markup: { inline_keyboard: [[{ text: t(lang, 'btnPay', { stars: PRO.stars }), url }]] },
+  });
+}
+
 // Раз в неделю (при первом сообщении новой недели) присылает короткий отчёт за прошлую. Только Pro и VIP.
 export async function weeklyReport(user, chatId) {
   if (!user.weekly || !isPro(user)) return;
@@ -160,6 +196,39 @@ export async function weeklyReport(user, chatId) {
   if (data.top.length) lines.push('', t(lang, 'weekTop'), ...data.top.map(([name, n], i) => `${['🥇', '🥈', '🥉'][i]} ${esc(name)} — ${n}`));
   if (data.hour !== null) lines.push('', t(lang, 'weekHour', { from: String(data.hour).padStart(2, '0'), to: String((data.hour + 1) % 24).padStart(2, '0') }));
   await send(chatId, lines.join('\n'), openButton(lang));
+}
+
+// Фото и видео, которые по ссылке Telegram отправляются «как фото/видео». Чтобы получить именно файл
+// (его можно сохранить в исходном виде, Telegram его не пережимает), бот скачивает его и отправляет документом.
+const AS_FILE = { photo: ['jpg', 'image/jpeg'], video: ['mp4', 'video/mp4'], video_note: ['mp4', 'video/mp4'], animation: ['mp4', 'video/mp4'] };
+export const canSendAsFile = (kind) => Boolean(AS_FILE[kind]);
+
+export function fileName(kind, date, meta = {}) {
+  if (meta.fileName) return meta.fileName;
+  const [ext] = AS_FILE[kind] ?? ['bin'];
+  const stamp = new Date((date ?? 0) * 1000).toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '_');
+  const fromMime = { 'video/quicktime': 'mov', 'video/webm': 'webm', 'image/png': 'png', 'image/webp': 'webp' }[meta.mime];
+  return `${kind}_${stamp}.${fromMime ?? ext}`;
+}
+
+// Отправляет фото или видео файлом без сжатия. Возвращает false, если не получилось
+// (тогда вызывающий код отправит обычным способом — качество то же, но это будет «фото», а не «файл»).
+export async function sendAsFile(chatId, file, date) {
+  const meta = file.meta ?? {};
+  if (!canSendAsFile(file.kind) || (meta.size ?? 0) > LIMITS.asFileMax) return false;
+  try {
+    const bytes = await api.getFileContent(file.fileId);
+    if (bytes.length > LIMITS.asFileMax) return false;
+    await api.sendDocument({
+      chat_id: chatId,
+      document: new InputFile(bytes, fileName(file.kind, date, meta), { type: meta.mime ?? AS_FILE[file.kind][1] }),
+      disable_content_type_detection: true, // иначе Telegram сам превратит файл обратно в «видео» или GIF
+    });
+    return true;
+  } catch (e) {
+    if (e instanceof BotApiError) return false;
+    throw e;
+  }
 }
 
 // Текст о сообщении: вид (если это не просто текст) и содержимое.
