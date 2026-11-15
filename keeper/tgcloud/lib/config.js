@@ -10,7 +10,7 @@ export const ADMIN_IDS = [
 
 // Адрес мини-приложения. Его печатает `npx tgcloud push` после первого деплоя
 // (вида https://app123456.tgcloud.ai/). Пока пусто — кнопка «История» не показывается.
-export const MINIAPP_URL = '';
+export const MINIAPP_URL = 'https://app9031922868.tgcloud.ai/';
 
 // Подписка Pro: цена в звёздах Telegram и срок (Telegram разрешает только 30 дней).
 export const PRO = {
