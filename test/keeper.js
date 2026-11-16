@@ -819,7 +819,8 @@ await step('Подарить Pro другу: платит один, Pro полу
   await assert.rejects(() => invoiceEndpoint({ plan: 'gift', to: '777002' }, ctx(OWNER)));            // не запускал бота
   sqlite.prepare("update users set username = 'Other_Nick' where id = ?").run(OTHER);
   const res = await invoiceEndpoint({ plan: 'gift', to: '@other_nick' }, ctx(OWNER));                 // по @username, регистр не важен
-  assert.equal(res.to.id, OTHER);
+  assert.equal(res.to.name, 'Use…');                                                                  // полное имя не раскрываем
+  assert.equal(res.to.id, undefined);
   assert.equal(sent(take(), 'createInvoiceLink')[0].params.payload, `gift:${OTHER}`);
   await onPreCheckout({ id: 'g1', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars, invoice_payload: `gift:${OTHER}` });
   await onPreCheckout({ id: 'g2', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars, invoice_payload: 'gift:abc' });
@@ -911,6 +912,84 @@ await step('Возврат звёзд: только владелец; Pro сни
   failures.rule = null;
   assert.equal(sqlite.prepare("select refunded from payments where charge_id = 'rf-bad'").get().refunded, 0);
   sqlite.prepare("delete from payments where charge_id like 'rf-%'").run();
+  givePro(OTHER, 0);
+  take();
+});
+
+await step('Ревью: подписка не стирает уже оплаченные дни; бонусы переживают продление', async () => {
+  const USER = 40;
+  sqlite.prepare('update users set pro_until = ?, sub_until = 0 where id = ?').run(now() + 365 * 86400, USER); // купил год
+  const pay = (charge, exp) => msg(USER, { successful_payment: { currency: 'XTR', total_amount: PRO.stars, invoice_payload: 'pro', telegram_payment_charge_id: charge, subscription_expiration_date: exp } });
+  const exp1 = now() + 30 * 86400;
+  await pay('sub-a', exp1);
+  assert.ok(Math.abs(userRow(USER).pro_until - (exp1 + 365 * 86400)) < 5);                            // год сохранился поверх месяца
+  sqlite.prepare('update users set pro_until = ?, sub_until = ? where id = ?').run(exp1 + 7 * 86400, exp1, USER); // остался месяц + 7 дней приза
+  const exp2 = exp1 + 30 * 86400;
+  await pay('sub-b', exp2);                                                                          // продление
+  assert.ok(Math.abs(userRow(USER).pro_until - (exp2 + 7 * 86400)) < 5);                              // приз не пропал
+  sqlite.prepare("delete from payments where charge_id in ('sub-a', 'sub-b')").run();
+  givePro(USER, 0);
+  take();
+});
+
+await step('Ревью: перебор PIN параллельными запросами — проверяется не больше 5 кодов, паузы растут', async () => {
+  const USER = 40;
+  await pinEndpoint({ set: '8642' }, ctx(USER));
+  // 300 одновременных попыток со всеми кодами подряд — верный среди них.
+  const tries = Array.from({ length: 300 }, (_, i) => String(8500 + i));
+  const results = await Promise.allSettled(tries.map((pin) => chatsEndpoint({ pin }, ctx(USER))));
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 0);                           // верный код в пачке не прошёл
+  assert.ok(userRow(USER).pin_lock > now());
+  const firstLock = userRow(USER).pin_lock - now();
+  sqlite.prepare('update users set pin_lock = 0 where id = ?').run(USER);
+  for (let i = 0; i < LIMITS.pinTries + 1; i++) await assert.rejects(() => chatsEndpoint({ pin: '0000' }, ctx(USER)));
+  assert.ok(userRow(USER).pin_lock - now() > firstLock);                                             // вторая пауза длиннее
+  sqlite.prepare('update users set pin_lock = 0 where id = ?').run(USER);
+  assert.equal((await chatsEndpoint({ pin: '8642' }, ctx(USER))).id, USER);                           // после паузы верный код работает
+  assert.equal(userRow(USER).pin_locks, 0);
+  await pinEndpoint({ pin: '8642', remove: true }, ctx(USER));
+});
+
+await step('Ревью: оплата по старой цене отклоняется', async () => {
+  await onPreCheckout({ id: 'pc1', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars + 100, invoice_payload: 'pro' });
+  await onPreCheckout({ id: 'pc2', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars, invoice_payload: 'year' });
+  await onPreCheckout({ id: 'pc3', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.yearStars, invoice_payload: 'year' });
+  await onPreCheckout({ id: 'pc4', from: tgUser(OWNER), currency: 'XTR', total_amount: PRO.stars, invoice_payload: `gift:${OTHER}` });
+  assert.deepEqual(sent(take(), 'answerPreCheckoutQuery').map((c) => c.params.ok), [false, false, true, true]);
+});
+
+await step('Ревью: подарок VIP или заблокированному не принимается, ответ не выдаёт, есть ли человек в боте', async () => {
+  sqlite.prepare('update users set vip = 1 where id = ?').run(OTHER);
+  const vip = await invoiceEndpoint({ plan: 'gift', to: String(OTHER) }, ctx(OWNER)).catch((e) => e.message);
+  const nobody = await invoiceEndpoint({ plan: 'gift', to: '987654321' }, ctx(OWNER)).catch((e) => e.message);
+  assert.equal(vip, nobody);
+  sqlite.prepare('update users set vip = 0, banned = 1 where id = ?').run(OTHER);
+  assert.equal(await invoiceEndpoint({ plan: 'gift', to: String(OTHER) }, ctx(OWNER)).catch((e) => e.message), nobody);
+  sqlite.prepare('update users set banned = 0 where id = ?').run(OTHER);
+  take();
+});
+
+await step('Ревью: призы рейтинга не начисляются повторно двойным нажатием', async () => {
+  sqlite.prepare("delete from settings where key = 'prizeAt'").run();
+  givePro(OTHER, 0);
+  await adminEndpoint({ action: 'refPrize' }, ctx(OWNER_ID));
+  const after = userRow(OTHER).pro_until;
+  await assert.rejects(() => adminEndpoint({ action: 'refPrize' }, ctx(OWNER_ID)));
+  assert.equal(userRow(OTHER).pro_until, after);
+  sqlite.prepare("delete from settings where key = 'prizeAt'").run();
+  givePro(OTHER, 0);
+  take();
+});
+
+await step('Ревью: возврат звёзд со стороны Telegram (refunded_payment) снимает Pro', async () => {
+  givePro(OTHER, now() + 365 * 86400);
+  sqlite.prepare("insert into payments (charge_id, user_id, stars, at, kind, for_user) values ('rp-1', ?, 450, ?, 'year', ?)").run(OTHER, now(), OTHER);
+  const refund = { refunded_payment: { currency: 'XTR', total_amount: 450, invoice_payload: 'year', telegram_payment_charge_id: 'rp-1' } };
+  await msg(OTHER, refund, 'uz');
+  await msg(OTHER, refund, 'uz');                                                                    // повтор ничего не меняет
+  assert.ok(Math.abs(userRow(OTHER).pro_until - now()) < 5);
+  assert.ok(sqlite.prepare("select refunded from payments where charge_id = 'rp-1'").get().refunded > 0);
+  sqlite.prepare("delete from payments where charge_id = 'rp-1'").run();
   givePro(OTHER, 0);
   take();
 });

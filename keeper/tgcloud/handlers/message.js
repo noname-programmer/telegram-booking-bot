@@ -6,6 +6,7 @@ import { ADMIN_IDS, OWNER_ID, PRO } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
 import {
   getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo, recordPayment, addProDays, paymentsOf,
+  getPayment, markRefunded,
 } from '../lib/store.js';
 import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate, esc, proReminder } from '../lib/ui.js';
 
@@ -14,6 +15,13 @@ export default async function onMessage(message) {
   const chatId = message.chat.id;
   const user = await getUser(message.from);
   const lang = user.lang;
+
+  // Звёзды вернули (из админ-панели или через поддержку Telegram) — снимаем Pro за этот платёж.
+  if (message.refunded_payment) {
+    const pay = await getPayment(message.refunded_payment.telegram_payment_charge_id);
+    if (pay && !pay.refunded) await markRefunded(pay);
+    return;
+  }
 
   // Оплата прошла (первая или автоматическое продление): включаем Pro.
   const pay = message.successful_payment;

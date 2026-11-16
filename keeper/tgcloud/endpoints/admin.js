@@ -12,7 +12,8 @@
 //   { action: 'refPrize' }                     — наградить три первых места рейтинга приглашений (REF.prizes)
 // Помощнику доступно всё, кроме VIP, рассылки, настроек и назначения помощников — это только владельцу.
 
-import { api, BotApiError, EndpointError } from 'sdk';
+import { api, db, BotApiError, EndpointError } from 'sdk';
+import { sql } from 'sdk/db';
 import { LIMITS, REF } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
 import {
@@ -74,6 +75,11 @@ export default async function (input, ctx) {
 
   if (input.action === 'refPrize') {
     requireOwner(user);
+    // Защита от двойного нажатия: призы — не чаще раза в сутки.
+    const last = Number((await db.get(sql`select value from settings where key = 'prizeAt'`))?.value ?? 0);
+    if (Date.now() / 1000 - last < 24 * 3600) throw bad('PRIZE_TOO_SOON');
+    await db.run(sql`insert into settings (key, value) values ('prizeAt', ${Math.floor(Date.now() / 1000)})
+      on conflict(key) do update set value = excluded.value`);
     const winners = await refTop(REF.prizes.length);
     for (const [i, w] of winners.entries()) {
       await addProDays(w.id, REF.prizes[i]);

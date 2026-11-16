@@ -14,9 +14,14 @@ export default async function (input, ctx) {
   const { user, pro } = await whoami(ctx, input);
   if (input.plan === 'gift') {
     const friend = await findUser(input.to);
-    if (!friend || !friend.name) throw new EndpointError(t(user.lang, 'giftNoUser'), { code: 'NO_USER' });
+    // Не нашли, заблокирован или уже VIP (подарок ему не нужен) — отвечаем одинаково,
+    // чтобы по этому ответу нельзя было выяснить, пользуется ли человек ботом.
+    if (!friend || !friend.name || friend.banned || friend.vip) throw new EndpointError(t(user.lang, 'giftNoUser'), { code: 'NO_USER' });
     if (friend.id === user.id) throw new EndpointError(t(user.lang, 'giftSelf'), { code: 'SELF' });
-    return { url: await invoiceLink(user.lang, 'gift', friend.id), pro, to: { id: friend.id, name: friend.name } };
+    // Полное имя не отдаём — только первые буквы, чтобы человек понял, тому ли дарит.
+    const letters = Array.from(friend.name);
+    const name = letters.length > 3 ? `${letters.slice(0, 3).join('')}…` : friend.name;
+    return { url: await invoiceLink(user.lang, 'gift', friend.id), pro, to: { name } };
   }
   if (user.vip) throw new EndpointError('VIP', { code: 'ALREADY_VIP' });
   return { url: await invoiceLink(user.lang, input.plan === 'year' ? 'year' : 'month'), pro };
