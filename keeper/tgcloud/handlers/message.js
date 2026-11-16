@@ -2,10 +2,10 @@
 // (Сообщения из чатов пользователя с другими людьми приходят в handlers/business_message.js.)
 
 import { api } from 'sdk';
-import { ADMIN_IDS, PRO } from '../lib/config.js';
+import { ADMIN_IDS, OWNER_ID, PRO } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
 import {
-  getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo, recordPayment, addProDays,
+  getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo, recordPayment, addProDays, paymentsOf,
 } from '../lib/store.js';
 import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate, esc, proReminder } from '../lib/ui.js';
 
@@ -21,14 +21,14 @@ export default async function onMessage(message) {
     const charge = pay.telegram_payment_charge_id;
     // Год со скидкой: разовая оплата, дни прибавляются к уже оплаченному сроку.
     if (pay.invoice_payload === 'year') {
-      if (!(await recordPayment(charge, user.id, pay.total_amount))) return;
+      if (!(await recordPayment(charge, user.id, pay.total_amount, 'year'))) return;
       const date = await addProDays(user.id, PRO.yearDays);
       return send(chatId, t(lang, 'proThanks', { date: fmtDate(date) }));
     }
     // Подарок другу: Pro получает не тот, кто платил.
     const gift = /^gift:(\d+)$/.exec(pay.invoice_payload ?? '');
     if (gift) {
-      if (!(await recordPayment(charge, user.id, pay.total_amount))) return;
+      if (!(await recordPayment(charge, user.id, pay.total_amount, 'gift', Number(gift[1])))) return;
       const friend = await getUser({ id: Number(gift[1]) });
       const date = await addProDays(friend.id, PRO.giftDays);
       await send(friend.id, t(friend.lang, 'giftGot', { name: esc(user.name || '?'), days: PRO.giftDays, date: fmtDate(date) }));
@@ -53,6 +53,21 @@ export default async function onMessage(message) {
   if (command === '/promo') {
     const res = await redeemPromo(user, (message.text ?? '').split(/\s+/)[1]);
     return send(chatId, res.ok ? t(lang, 'promoOk', { days: res.days, date: fmtDate(res.until) }) : t(lang, `promo_${res.reason}`));
+  }
+
+  // /terms — условия использования (Telegram требует их у ботов, которые принимают оплату).
+  if (command === '/terms') return send(chatId, t(lang, 'terms'));
+
+  // /paysupport — вопрос по оплате. Текст после команды пересылаем владельцу вместе с последними оплатами.
+  if (command === '/paysupport') {
+    const question = (message.text ?? '').replace(/^\/paysupport(@\w+)?\s*/, '').trim().slice(0, 1500);
+    if (!question) return send(chatId, t(lang, 'paySupportHow'));
+    const pays = (await paymentsOf(user.id)).map((p) => `${fmtDate(p.at)} · ${p.kind} · ⭐️${p.stars}${p.refunded ? ' · refunded' : ''}\n<code>${esc(p.chargeId)}</code>`);
+    await send(OWNER_ID, [
+      `🧾 <b>/paysupport</b> — ${esc(user.name || '?')}${user.username ? ` @${esc(user.username)}` : ''} · ID <code>${user.id}</code>`,
+      '', esc(question), '', pays.length ? pays.join('\n') : '—',
+    ].join('\n'));
+    return send(chatId, t(lang, 'paySupportSent'));
   }
 
   // /resetpin — забыли PIN-код от приложения. Сбросить можно только вместе со всеми сохранёнными данными,
@@ -81,8 +96,8 @@ export default async function onMessage(message) {
   // /start, /help и любой другой текст — главное меню.
   const me = await api.getMe();
   await send(chatId, ...split(await menu(user, me.username)));
-  // Если Pro заканчивается завтра — напоминаем (один раз на каждый срок).
-  return proReminder(user, chatId);
+  // Если Pro заканчивается завтра — напоминаем (один раз на каждый срок). Best-effort: не роняем ответ на /start.
+  try { await proReminder(user, chatId); } catch { /* напомним в следующий раз */ }
 }
 
 // { text, reply_markup } → аргументы для send(chatId, text, extra)

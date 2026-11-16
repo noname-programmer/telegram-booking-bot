@@ -328,10 +328,32 @@ export async function digestTick(user, field, n = 1) {
 }
 
 // Записывает разовую оплату (год или подарок). false — если уведомление об этом платеже уже приходило.
-export async function recordPayment(chargeId, userId, stars) {
+// kind — 'year' или 'gift'; forUser — кто получает Pro (для подарка — друг).
+export async function recordPayment(chargeId, userId, stars, kind = 'year', forUser = userId) {
   if (await db.select().from(payments).where(eq(payments.chargeId, chargeId)).get()) return false;
-  await db.insert(payments).values({ chargeId, userId, stars, at: now() }).run();
+  await db.insert(payments).values({ chargeId, userId, stars, at: now(), kind, forUser }).run();
   return true;
+}
+
+// Последние оплаты пользователя — для обращения в поддержку (/paysupport).
+export async function paymentsOf(userId, limit = 5) {
+  return db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.at)).limit(limit).all();
+}
+
+export async function getPayment(chargeId) {
+  return db.select().from(payments).where(eq(payments.chargeId, String(chargeId ?? ''))).get();
+}
+
+// Отмечает возврат звёзд и снимает Pro, полученный за этот платёж (у VIP Pro не снимается — он бессрочный).
+export async function markRefunded(payment) {
+  await db.update(payments).set({ refunded: now() }).where(eq(payments.chargeId, payment.chargeId)).run();
+  const target = payment.forUser ?? payment.userId;
+  const user = await db.select().from(users).where(eq(users.id, target)).get();
+  if (!user) return;
+  const days = payment.kind === 'year' ? PRO.yearDays : payment.kind === 'gift' ? PRO.giftDays : 0;
+  // Подписку снимаем целиком; год и подарок — вычитаем их дни, но не раньше «сейчас».
+  const proUntil = days ? Math.max(now(), user.proUntil - days * DAY) : now();
+  await db.update(users).set({ proUntil: Math.min(user.proUntil, proUntil) }).where(eq(users.id, target)).run();
 }
 
 // Ищет пользователя по ID или @username (для подарка). Только среди тех, кто уже запускал бота.
@@ -369,7 +391,7 @@ export async function refTop(limit = 10) {
 export async function grantPro(userId, until, chargeId, stars) {
   const seen = await db.select().from(payments).where(eq(payments.chargeId, chargeId)).get();
   if (seen) return false;
-  await db.insert(payments).values({ chargeId, userId, stars, at: now() }).run();
+  await db.insert(payments).values({ chargeId, userId, stars, at: now(), kind: 'pro', forUser: userId }).run();
   await db.update(users).set({ proUntil: until }).where(eq(users.id, userId)).run();
   return true;
 }
@@ -470,14 +492,17 @@ export function details(m) {
 export const displayName = (u) => [u?.first_name, u?.last_name].filter(Boolean).join(' ') || u?.title || '?';
 
 // Сохраняет сообщение собеседника. Защищённый от копирования контент не сохраняем.
+// Возвращает true, если это новая запись (а не повтор того же сообщения). По этому признаку
+// обработчик решает, наращивать ли счётчики: при повторной доставке апдейта Telegram'ом они не задвоятся.
 export async function saveMessage(conn, m) {
-  if (m.has_protected_content) return;
+  if (m.has_protected_content) return false;
   const d = describe(m);
-  await db.insert(messages).values({
+  const inserted = await db.insert(messages).values({
     connId: conn.id, ownerId: conn.userId, chatId: m.chat.id, messageId: m.message_id,
     fromName: displayName(m.from ?? m.chat), fromId: m.from?.id ?? null, username: m.from?.username ?? null,
     date: m.date ?? now(), ...d, meta: details(m),
-  }).onConflictDoNothing().run();
+  }).onConflictDoNothing().returning({ id: messages.id });
+  return inserted.length > 0;
 }
 
 // ---------- чаты (собеседники) ----------
@@ -672,7 +697,7 @@ export async function stats() {
     conns: await one(sql`select count(*) as n from connections where enabled = 1`),
     pro: await one(sql`select count(*) as n from users where pro_until > ${t} or vip = 1`),
     msgs: await one(sql`select count(*) as n from messages`),
-    stars: await one(sql`select coalesce(sum(stars), 0) as n from payments`),
+    stars: await one(sql`select coalesce(sum(stars), 0) as n from payments where refunded = 0`),
   };
 }
 

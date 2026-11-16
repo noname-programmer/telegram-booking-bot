@@ -471,6 +471,36 @@ await step('«Сейф»: удалённый файл копируется в к
   take();
 });
 
+await step('Повторная доставка того же сообщения не задваивает счётчик', async () => {
+  const before = sqlite.prepare('select saved from chats where owner_id = ? and chat_id = ?').get(OWNER, FRIEND).saved;
+  const m = biz({ text: 'повтор' });
+  await onBizMessage(m);
+  await onBizMessage(m);                                                                             // Telegram прислал апдейт ещё раз
+  assert.equal(sqlite.prepare('select saved from chats where owner_id = ? and chat_id = ?').get(OWNER, FRIEND).saved, before + 1);
+  assert.equal(sqlite.prepare("select count(*) as n from messages where text = 'повтор'").get().n, 1);
+  sqlite.prepare("delete from messages where text = 'повтор'").run();
+});
+
+await step('Сейф — только канал: группа с другими участниками сейфом не становится', async () => {
+  await onMyChatMember({ chat: { id: -100600, type: 'supergroup', title: 'Семья' }, from: tgUser(OWNER), new_chat_member: { status: 'administrator' } });
+  await onMyChatMember({ chat: { id: -100601, type: 'group', title: 'Друзья' }, from: tgUser(OWNER), new_chat_member: { status: 'member' } });
+  assert.equal(userRow(OWNER).vault_id, null);
+  assert.equal(take().length, 0);
+});
+
+await step('Сбой Bot API в конце обработки не теряет сообщение', async () => {
+  failures.rule = (method) => (method === 'createInvoiceLink' || method === 'sendMessage' ? new BotApiError(method, 500, 'Internal') : undefined);
+  givePro(OWNER, now() + 3600);                                                                      // напоминание попробует создать счёт и упадёт
+  const m = biz({ text: 'устойчивость' });
+  await onBizMessage(m);                                                                             // не бросает
+  failures.rule = null;
+  assert.equal(sqlite.prepare("select count(*) as n from messages where text = 'устойчивость'").get().n, 1);
+  sqlite.prepare("delete from messages where text = 'устойчивость'").run();
+  sqlite.prepare('update users set reminded_for = 0 where id = ?').run(OWNER);
+  givePro(OWNER, 0);
+  take();
+});
+
 await step('Галерея: только фото и видео, у фото есть уменьшенное превью', async () => {
   const m = biz({ photo: [{ file_id: 'g-s', width: 90 }, { file_id: 'g-m', width: 320 }, { file_id: 'g-l', width: 1280 }] });
   await onBizMessage(m);
@@ -835,6 +865,54 @@ await step('Полная выгрузка: все собеседники одн�
   givePro(OWNER, 0);
   await assert.rejects(() => exportEndpoint({ all: true }, ctx(OWNER)));                              // без Pro нельзя
   sqlite.prepare('delete from messages where chat_id = 555').run();
+});
+
+await step('/terms и /paysupport: условия и обращение по оплате уходит владельцу', async () => {
+  await msg(OWNER, { text: '/terms' });
+  assert.match(texts(take()), /Условия использования/);
+  await msg(OWNER, { text: '/paysupport' });
+  assert.match(texts(take()), /Вопрос по оплате/);
+  sqlite.prepare("insert into payments (charge_id, user_id, stars, at, kind, for_user) values ('ps-1', ?, 150, ?, 'pro', ?)").run(OWNER, now(), OWNER);
+  await msg(OWNER, { text: '/paysupport оплатил <b>Pro</b>, не включился' });
+  const out = sent(take());
+  const toOwner = out.find((c) => c.params.chat_id === OWNER_ID);
+  assert.match(toOwner.params.text, /оплатил &lt;b&gt;Pro&lt;\/b&gt;/);                                 // текст экранирован
+  assert.match(toOwner.params.text, /ps-1/);
+  assert.ok(out.some((c) => c.params.chat_id === OWNER && /передано/.test(c.params.text)));
+  sqlite.prepare("delete from payments where charge_id = 'ps-1'").run();
+});
+
+await step('Возврат звёзд: только владелец; Pro снимается, подписка отменяется, выручка не считает возврат', async () => {
+  const admin = ctx(OWNER_ID);
+  const until = now() + 30 * 86400;
+  givePro(OTHER, until);
+  sqlite.prepare("insert into payments (charge_id, user_id, stars, at, kind, for_user) values ('rf-sub', ?, 150, ?, 'pro', ?)").run(OTHER, now(), OTHER);
+  await assert.rejects(() => adminEndpoint({ action: 'refund', chargeId: 'rf-sub' }, ctx(OWNER)));       // не владелец
+  const before = (await adminEndpoint({}, admin)).totals.stars;
+  const data = await adminEndpoint({ action: 'refund', chargeId: 'rf-sub' }, admin);
+  const out = take();
+  assert.deepEqual(sent(out, 'refundStarPayment')[0].params, { user_id: OTHER, telegram_payment_charge_id: 'rf-sub' });
+  assert.equal(sent(out, 'editUserStarSubscription')[0].params.is_canceled, true);
+  assert.ok(sent(out).some((c) => c.params.chat_id === OTHER && /⭐️ 150/.test(c.params.text)));
+  assert.ok(userRow(OTHER).pro_until <= now());
+  assert.equal(data.totals.stars, before - 150);
+  assert.ok(data.payments.find((p) => p.chargeId === 'rf-sub').refunded > 0);
+  await assert.rejects(() => adminEndpoint({ action: 'refund', chargeId: 'rf-sub' }, admin));          // второй раз нельзя
+  // Подарок: возврат снимает дни у получателя, а не у плательщика.
+  givePro(OTHER, now() + 40 * 86400);
+  sqlite.prepare("insert into payments (charge_id, user_id, stars, at, kind, for_user) values ('rf-gift', ?, 150, ?, 'gift', ?)").run(OWNER, now(), OTHER);
+  await adminEndpoint({ action: 'refund', chargeId: 'rf-gift' }, admin);
+  assert.equal(sent(take(), 'editUserStarSubscription').length, 0);                                    // у подарка подписки нет
+  assert.ok(Math.abs(userRow(OTHER).pro_until - (now() + (40 - PRO.giftDays) * 86400)) < 5);
+  // Telegram отказал в возврате — ничего не меняем.
+  sqlite.prepare("insert into payments (charge_id, user_id, stars, at, kind, for_user) values ('rf-bad', ?, 150, ?, 'year', ?)").run(OTHER, now(), OTHER);
+  failures.rule = (method) => (method === 'refundStarPayment' ? new BotApiError(method, 400, 'CHARGE_ALREADY_REFUNDED') : undefined);
+  await assert.rejects(() => adminEndpoint({ action: 'refund', chargeId: 'rf-bad' }, admin), /CHARGE_ALREADY_REFUNDED/);
+  failures.rule = null;
+  assert.equal(sqlite.prepare("select refunded from payments where charge_id = 'rf-bad'").get().refunded, 0);
+  sqlite.prepare("delete from payments where charge_id like 'rf-%'").run();
+  givePro(OTHER, 0);
+  take();
 });
 
 await step('Чужую историю в мини-приложении не видно', async () => {

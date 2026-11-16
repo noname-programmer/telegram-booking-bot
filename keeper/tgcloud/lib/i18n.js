@@ -78,6 +78,18 @@ const T = {
     giftSelf: 'Себе подарок сделать нельзя — для себя есть обычная оплата.',
     prizeGot: '🏆 Вы на {place}-м месте в рейтинге приглашений — вам начислено {days} дн. Pro. Спасибо!',
     exportAllCaption: 'Все сохранённые сообщения',
+    terms: '📄 <b>Условия использования Keeper</b>\n\n'
+      + '1. Бот сохраняет сообщения собеседников из ваших личных чатов, к которым вы сами дали доступ через «Telegram для бизнеса». '
+      + 'Используйте его только для своих переписок и в рамках закона вашей страны.\n'
+      + '2. Свои сообщения, защищённый от копирования контент и исчезающие фото и видео бот не сохраняет.\n'
+      + '3. Pro — цифровая услуга внутри Telegram, оплачивается звёздами. Подписку можно отменить в настройках Telegram; '
+      + 'уже оплаченный срок действует до конца.\n'
+      + '4. Возврат звёзд возможен, если услуга не работала по нашей вине: напишите /paysupport и опишите проблему.\n'
+      + '5. Данные хранятся ограниченный срок и удаляются при отключении бота или по кнопке «Удалить все данные».\n'
+      + '6. Бот предоставляется «как есть»; Telegram может менять возможности, на которых он основан.',
+    paySupportHow: '🧾 <b>Вопрос по оплате</b>\n\nНапишите одним сообщением: /paysupport и что случилось. Например:\n<code>/paysupport оплатил Pro, но он не включился</code>\n\nОтвет придёт в этот чат.',
+    paySupportSent: '✅ Обращение передано. Ответим в этот чат.',
+    refunded: '↩️ Вам вернули ⭐️ {stars}. Pro за этот платёж снят.',
     connected: '✅ Подключено! Теперь я буду присылать сюда сообщения, которые собеседники удалят или изменят.',
     disconnected: '⚪️ Бот отключён от аккаунта. Сохранённые сообщения удалены.',
     deleted: '🗑 <b>{name}</b> удалил(а) сообщение:',
@@ -185,6 +197,18 @@ const T = {
     giftSelf: "O'zingizga sovg'a qilib bo'lmaydi — o'zingiz uchun oddiy to'lov bor.",
     prizeGot: "🏆 Siz takliflar reytingida {place}-o'rindasiz — sizga {days} kun Pro qo'shildi. Rahmat!",
     exportAllCaption: 'Barcha saqlangan xabarlar',
+    terms: "📄 <b>Keeper dan foydalanish shartlari</b>\n\n"
+      + "1. Bot «Telegram biznes uchun» orqali o'zingiz ruxsat bergan shaxsiy chatlardagi suhbatdoshlar xabarlarini saqlaydi. "
+      + "Undan faqat o'z yozishmalaringiz uchun va mamlakatingiz qonunlari doirasida foydalaning.\n"
+      + "2. O'z xabarlaringiz, nusxalashdan himoyalangan kontent va yo'qoluvchi rasm va videolar saqlanmaydi.\n"
+      + "3. Pro — Telegram ichidagi raqamli xizmat, yulduzlar bilan to'lanadi. Obunani Telegram sozlamalarida bekor qilish mumkin; "
+      + "to'langan muddat oxirigacha amal qiladi.\n"
+      + "4. Xizmat bizning aybimiz bilan ishlamagan bo'lsa, yulduzlarni qaytarish mumkin: /paysupport deb yozing va muammoni tasvirlang.\n"
+      + "5. Ma'lumotlar cheklangan muddat saqlanadi va bot uzilganda yoki «Barcha ma'lumotlarni o'chirish» tugmasi bilan o'chiriladi.\n"
+      + "6. Bot «qanday bo'lsa shunday» taqdim etiladi; Telegram u asoslangan imkoniyatlarni o'zgartirishi mumkin.",
+    paySupportHow: "🧾 <b>To'lov bo'yicha savol</b>\n\nBitta xabarda yozing: /paysupport va nima bo'lganini. Masalan:\n<code>/paysupport Pro uchun to'ladim, lekin yoqilmadi</code>\n\nJavob shu chatga keladi.",
+    paySupportSent: '✅ Murojaat yuborildi. Shu chatga javob beramiz.',
+    refunded: "↩️ Sizga ⭐️ {stars} qaytarildi. Bu to'lov uchun Pro olib tashlandi.",
     connected: "✅ Ulandi! Endi suhbatdoshlar o'chirgan yoki o'zgartirgan xabarlarni shu yerga yuboraman.",
     disconnected: "⚪️ Bot akkauntdan uzildi. Saqlangan xabarlar o'chirildi.",
     deleted: "🗑 <b>{name}</b> xabarni o'chirdi:",
@@ -292,6 +316,18 @@ const T = {
     giftSelf: 'You cannot gift yourself — use the regular payment instead.',
     prizeGot: '🏆 You are #{place} in the invite ranking — you got {days} days of Pro. Thank you!',
     exportAllCaption: 'All saved messages',
+    terms: '📄 <b>Keeper terms of use</b>\n\n'
+      + '1. The bot stores messages from the people you chat with privately, in chats you gave it access to through Telegram Business. '
+      + 'Use it only for your own conversations and within the law of your country.\n'
+      + '2. Your own messages, copy-protected content and self-destructing photos and videos are never saved.\n'
+      + '3. Pro is a digital service inside Telegram, paid in Stars. You can cancel the subscription in Telegram settings; '
+      + 'the period already paid for stays active until it ends.\n'
+      + '4. Stars can be refunded if the service did not work through our fault: send /paysupport and describe the problem.\n'
+      + '5. Data is kept for a limited time and is deleted when you disconnect the bot or tap “Delete all data”.\n'
+      + '6. The bot is provided “as is”; Telegram may change the features it relies on.',
+    paySupportHow: '🧾 <b>Payment question</b>\n\nWrite it in one message: /paysupport and what happened. For example:\n<code>/paysupport I paid for Pro but it did not turn on</code>\n\nThe answer will come to this chat.',
+    paySupportSent: '✅ Your request has been passed on. We will reply in this chat.',
+    refunded: '↩️ ⭐️ {stars} were refunded to you. Pro for this payment has been removed.',
     connected: '✅ Connected! I will now send you messages that people delete or edit.',
     disconnected: '⚪️ The bot was disconnected. Saved messages have been deleted.',
     deleted: '🗑 <b>{name}</b> deleted a message:',

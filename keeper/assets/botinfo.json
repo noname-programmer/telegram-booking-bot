@@ -26,6 +26,14 @@
       [
         "resetpin",
         "Forgot the app PIN"
+      ],
+      [
+        "terms",
+        "Terms of use"
+      ],
+      [
+        "paysupport",
+        "Payment question: /paysupport text"
       ]
     ]
   },
@@ -56,6 +64,14 @@
       [
         "resetpin",
         "Забыли PIN-код приложения"
+      ],
+      [
+        "terms",
+        "Условия использования"
+      ],
+      [
+        "paysupport",
+        "Вопрос по оплате: /paysupport текст"
       ]
     ]
   },
@@ -86,6 +102,14 @@
       [
         "resetpin",
         "Ilova PIN-kodini unutdingizmi"
+      ],
+      [
+        "terms",
+        "Foydalanish shartlari"
+      ],
+      [
+        "paysupport",
+        "To'lov bo'yicha savol: /paysupport matn"
       ]
     ]
   }

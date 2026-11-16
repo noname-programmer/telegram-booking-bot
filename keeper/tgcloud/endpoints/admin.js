@@ -8,15 +8,16 @@
 //   { action: 'role', userId, on }             — назначить или снять помощника (второго админа)
 //   { action: 'promoAdd', code, days, uses }   — создать промокод;  { action: 'promoDel', code } — удалить
 //   { action: 'settings', values: {…} }        — цена и лимиты (см. TUNABLE в lib/store.js)
+//   { action: 'refund', chargeId }             — вернуть звёзды за платёж (только владелец); Pro за него снимается
 //   { action: 'refPrize' }                     — наградить три первых места рейтинга приглашений (REF.prizes)
 // Помощнику доступно всё, кроме VIP, рассылки, настроек и назначения помощников — это только владельцу.
 
-import { EndpointError } from 'sdk';
+import { api, BotApiError, EndpointError } from 'sdk';
 import { LIMITS, REF } from '../lib/config.js';
 import { t } from '../lib/i18n.js';
 import {
   adminOverview, adminSetPro, adminSetVip, adminSetBanned, adminSetRole, broadcastBatch,
-  createPromo, deletePromo, saveSettings, refTop, addProDays, getUser,
+  createPromo, deletePromo, saveSettings, refTop, addProDays, getUser, getPayment, markRefunded,
 } from '../lib/store.js';
 import { send, esc } from '../lib/ui.js';
 import { whoami, requireAdmin, requireOwner } from '../lib/app.js';
@@ -47,6 +48,28 @@ export default async function (input, ctx) {
   if (input.action === 'settings') {
     requireOwner(user);
     if (!(await saveSettings(input.values ?? {}))) throw bad('BAD_INPUT');
+  }
+
+  if (input.action === 'refund') {
+    requireOwner(user);
+    const pay = await getPayment(input.chargeId);
+    if (!pay) throw bad('NOT_FOUND');
+    if (pay.refunded) throw bad('ALREADY');
+    try {
+      await api.refundStarPayment({ user_id: pay.userId, telegram_payment_charge_id: pay.chargeId });
+    } catch (e) {
+      if (e instanceof BotApiError) throw new EndpointError(e.description ?? 'Refund failed', { code: 'REFUND_FAILED' });
+      throw e;
+    }
+    // Возврат за подписку — ещё и отменяем её, иначе через месяц Telegram спишет звёзды снова.
+    if (pay.kind === 'pro') {
+      try {
+        await api.editUserStarSubscription({ user_id: pay.userId, telegram_payment_charge_id: pay.chargeId, is_canceled: true });
+      } catch (e) { if (!(e instanceof BotApiError)) throw e; } // подписка уже отменена или истекла — не страшно
+    }
+    await markRefunded(pay);
+    const payer = await getUser({ id: pay.userId });
+    await send(pay.userId, t(payer.lang, 'refunded', { stars: pay.stars }));
   }
 
   if (input.action === 'refPrize') {

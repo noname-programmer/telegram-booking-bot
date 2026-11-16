@@ -152,4 +152,7 @@ export const payments = table('payments', {
   userId:   integer('user_id').notNull(),
   stars:    integer('stars').notNull(),
   at:       integer('at').notNull(),
+  kind:     text('kind').notNull().default('pro'),    // 'pro' (подписка) | 'year' | 'gift'
+  forUser:  integer('for_user'),                      // кто получил Pro (у подарка — не тот, кто платил)
+  refunded: integer('refunded').notNull().default(0), // когда звёзды вернули (0 — не возвращали)
 });

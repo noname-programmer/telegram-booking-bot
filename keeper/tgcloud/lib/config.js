@@ -15,11 +15,11 @@ export const MINIAPP_URL = 'https://app9031922868.tgcloud.ai/';
 
 // Подписка Pro: цена в звёздах Telegram и срок (Telegram разрешает только 30 дней).
 export const PRO = {
-  stars: 150,
+  stars: 50,
   periodSeconds: 30 * 24 * 60 * 60,
   trialDays: 3,       // пробный Pro для нового пользователя (один раз)
   // Год со скидкой: разовая оплата на 365 дней. Автопродления нет — Telegram разрешает его только раз в 30 дней.
-  yearStars: 1500,
+  yearStars: 450,
   yearDays: 365,
   giftDays: 30,       // «Подарить Pro другу»: на сколько дней, по цене одного месяца
 };
