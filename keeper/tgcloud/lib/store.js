@@ -66,7 +66,7 @@ export async function getUser(tgUser) {
     found = {
       id: tgUser.id, lang: pickLang(tgUser.language_code), proUntil: 0, name, username,
       notify: 0, favOnly: 0, vip: 0, trial: 0, tz: 300, refBy: null, refDone: 0,
-      alertClear: 1, remindedFor: 0, digestDay: 0, digestDel: 0, digestEd: 0, banned: 0, role: '', pin: null, pinFails: 0, pinLock: 0,
+      alertClear: 1, remindedFor: 0, digestDay: 0, digestDel: 0, digestEd: 0, banned: 0, role: '', pin: null, pinFails: 0, pinLock: 0, pinLocks: 0, subUntil: 0,
       vaultId: null, vaultTitle: '', weekly: 1, reportWeek: 0, created: now(),
     };
     await db.insert(users).values(found).onConflictDoNothing({ target: users.id }).run();
@@ -134,23 +134,33 @@ export function pinHash(userId, pin) {
 export const validPin = (pin) => typeof pin === 'string' && /^\d{4,8}$/.test(pin);
 
 export async function setPin(user, pin) {
-  const patch = { pin: pin === null ? null : pinHash(user.id, pin), pinFails: 0, pinLock: 0 };
+  const patch = { pin: pin === null ? null : pinHash(user.id, pin), pinFails: 0, pinLock: 0, pinLocks: 0 };
   await setPrefs(user.id, patch);
   Object.assign(user, patch);
 }
 
 // Проверяет PIN. 'ok' | 'wrong' | 'wait' (слишком много попыток — пауза).
+// Защита от перебора: попытка сначала засчитывается в базе (атомарно, одним запросом), и только потом
+// код сравнивается. Поэтому даже тысяча одновременных запросов успеет проверить не больше pinTries кодов.
+// Каждая следующая блокировка вдвое длиннее предыдущей (до суток).
 export async function checkPin(user, pin) {
-  if (user.pinLock > now()) return 'wait';
-  if (validPin(pin) && pinHash(user.id, pin) === user.pin) {
-    if (user.pinFails) await setPrefs(user.id, { pinFails: 0 });
+  await db.run(sql`update users set pin_fails = pin_fails + 1 where id = ${user.id}`);
+  const fresh = await db.select().from(users).where(eq(users.id, user.id)).get();
+  Object.assign(user, { pinFails: fresh.pinFails, pinLock: fresh.pinLock, pinLocks: fresh.pinLocks });
+  if (fresh.pinLock > now()) return 'wait';
+  if (fresh.pinFails > LIMITS.pinTries) {
+    const pause = Math.min(LIMITS.pinPause * 2 ** Math.min(fresh.pinLocks, 8), DAY);
+    const patch = { pinFails: 0, pinLock: now() + pause, pinLocks: fresh.pinLocks + 1 };
+    await setPrefs(user.id, patch);
+    Object.assign(user, patch);
+    return 'wait';
+  }
+  if (validPin(pin) && pinHash(user.id, pin) === fresh.pin) {
+    await setPrefs(user.id, { pinFails: 0, pinLocks: 0 });
+    Object.assign(user, { pinFails: 0, pinLocks: 0 });
     return 'ok';
   }
-  const fails = user.pinFails + 1;
-  const patch = fails >= LIMITS.pinTries ? { pinFails: 0, pinLock: now() + LIMITS.pinPause } : { pinFails: fails };
-  await setPrefs(user.id, patch);
-  Object.assign(user, patch);
-  return patch.pinLock ? 'wait' : 'wrong';
+  return fresh.pinFails === LIMITS.pinTries ? 'last' : 'wrong';
 }
 
 // ---------- промокоды ----------
@@ -328,10 +338,32 @@ export async function digestTick(user, field, n = 1) {
 }
 
 // Записывает разовую оплату (год или подарок). false — если уведомление об этом платеже уже приходило.
-export async function recordPayment(chargeId, userId, stars) {
+// kind — 'year' или 'gift'; forUser — кто получает Pro (для подарка — друг).
+export async function recordPayment(chargeId, userId, stars, kind = 'year', forUser = userId) {
   if (await db.select().from(payments).where(eq(payments.chargeId, chargeId)).get()) return false;
-  await db.insert(payments).values({ chargeId, userId, stars, at: now() }).run();
+  await db.insert(payments).values({ chargeId, userId, stars, at: now(), kind, forUser }).run();
   return true;
+}
+
+// Последние оплаты пользователя — для обращения в поддержку (/paysupport).
+export async function paymentsOf(userId, limit = 5) {
+  return db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.at)).limit(limit).all();
+}
+
+export async function getPayment(chargeId) {
+  return db.select().from(payments).where(eq(payments.chargeId, String(chargeId ?? ''))).get();
+}
+
+// Отмечает возврат звёзд и снимает Pro, полученный за этот платёж (у VIP Pro не снимается — он бессрочный).
+export async function markRefunded(payment) {
+  await db.update(payments).set({ refunded: now() }).where(eq(payments.chargeId, payment.chargeId)).run();
+  const target = payment.forUser ?? payment.userId;
+  const user = await db.select().from(users).where(eq(users.id, target)).get();
+  if (!user) return;
+  const days = payment.kind === 'year' ? PRO.yearDays : payment.kind === 'gift' ? PRO.giftDays : 0;
+  // Подписку снимаем целиком; год и подарок — вычитаем их дни, но не раньше «сейчас».
+  const proUntil = days ? Math.max(now(), user.proUntil - days * DAY) : now();
+  await db.update(users).set({ proUntil: Math.min(user.proUntil, proUntil) }).where(eq(users.id, target)).run();
 }
 
 // Ищет пользователя по ID или @username (для подарка). Только среди тех, кто уже запускал бота.
@@ -369,8 +401,12 @@ export async function refTop(limit = 10) {
 export async function grantPro(userId, until, chargeId, stars) {
   const seen = await db.select().from(payments).where(eq(payments.chargeId, chargeId)).get();
   if (seen) return false;
-  await db.insert(payments).values({ chargeId, userId, stars, at: now() }).run();
-  await db.update(users).set({ proUntil: until }).where(eq(users.id, userId)).run();
+  await db.insert(payments).values({ chargeId, userId, stars, at: now(), kind: 'pro', forUser: userId }).run();
+  // Дни сверх прошлого оплаченного периода (год, подарок, промокод, приз, пробный срок) не теряем —
+  // переносим их поверх нового периода подписки.
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  const extra = user ? Math.max(0, user.proUntil - Math.max(now(), user.subUntil)) : 0;
+  await db.update(users).set({ proUntil: until + extra, subUntil: until }).where(eq(users.id, userId)).run();
   return true;
 }
 
@@ -470,14 +506,17 @@ export function details(m) {
 export const displayName = (u) => [u?.first_name, u?.last_name].filter(Boolean).join(' ') || u?.title || '?';
 
 // Сохраняет сообщение собеседника. Защищённый от копирования контент не сохраняем.
+// Возвращает true, если это новая запись (а не повтор того же сообщения). По этому признаку
+// обработчик решает, наращивать ли счётчики: при повторной доставке апдейта Telegram'ом они не задвоятся.
 export async function saveMessage(conn, m) {
-  if (m.has_protected_content) return;
+  if (m.has_protected_content) return false;
   const d = describe(m);
-  await db.insert(messages).values({
+  const inserted = await db.insert(messages).values({
     connId: conn.id, ownerId: conn.userId, chatId: m.chat.id, messageId: m.message_id,
     fromName: displayName(m.from ?? m.chat), fromId: m.from?.id ?? null, username: m.from?.username ?? null,
     date: m.date ?? now(), ...d, meta: details(m),
-  }).onConflictDoNothing().run();
+  }).onConflictDoNothing().returning({ id: messages.id });
+  return inserted.length > 0;
 }
 
 // ---------- чаты (собеседники) ----------
@@ -529,8 +568,8 @@ export async function setMuted(ownerId, chatId, muted) {
 
 // Список собеседников: сначала те, у кого недавно что-то удалили или изменили.
 export async function listChats(ownerId) {
-  const rows = await db.select().from(chats).where(eq(chats.ownerId, ownerId)).all();
-  return rows.sort((a, b) => (b.eventAt - a.eventAt) || (b.lastAt - a.lastAt)).slice(0, 300);
+  return db.select().from(chats).where(eq(chats.ownerId, ownerId))
+    .orderBy(desc(chats.eventAt), desc(chats.lastAt)).limit(300).all();
 }
 
 export async function findMessage(connId, chatId, messageId) {
@@ -657,9 +696,11 @@ export async function cleanup() {
   const freeCut = t - LIMITS.freeDays * DAY;
   // Закладки (kept = 1) и закреплённые (pinned > 0) не стираем.
   const old = sql`kept = 0 and pinned = 0 and (date < ${proCut} or (date < ${freeCut} and owner_id not in (select id from users where pro_until > ${t} or vip = 1)))`;
-  await db.run(sql`delete from edits where msg_id in (select id from messages where ${old})`);
-  await db.run(sql`delete from edits where msg_id not in (select id from messages)`);
-  await db.run(sql`delete from messages where ${old}`);
+  // Стираем порцией, чтобы одна уборка не была долгой, сколько бы ни накопилось.
+  const ids = (await db.all(sql`select id from messages where ${old} limit 2000`)).map((r) => r.id);
+  if (!ids.length) return;
+  await db.delete(edits).where(inArray(edits.msgId, ids)).run();
+  await db.delete(messages).where(inArray(messages.id, ids)).run();
 }
 
 // ---------- статистика для владельца ----------
@@ -672,7 +713,7 @@ export async function stats() {
     conns: await one(sql`select count(*) as n from connections where enabled = 1`),
     pro: await one(sql`select count(*) as n from users where pro_until > ${t} or vip = 1`),
     msgs: await one(sql`select count(*) as n from messages`),
-    stars: await one(sql`select coalesce(sum(stars), 0) as n from payments`),
+    stars: await one(sql`select coalesce(sum(stars), 0) as n from payments where refunded = 0`),
   };
 }
 
@@ -688,7 +729,7 @@ const median = (list) => {
 export async function analytics(ownerId, tz = 0) {
   const shift = Math.max(-840, Math.min(840, Number(tz) || 0)) * 60;
   const t = now();
-  const list = await db.select().from(chats).where(eq(chats.ownerId, ownerId)).all();
+  const list = await db.select().from(chats).where(eq(chats.ownerId, ownerId)).limit(5000).all();
   const totals = { chats: list.length, saved: 0, deleted: 0, edited: 0 };
   for (const c of list) { totals.saved += c.saved; totals.deleted += c.deleted; totals.edited += c.edited; }
 

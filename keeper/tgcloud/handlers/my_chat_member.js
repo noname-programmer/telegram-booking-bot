@@ -11,10 +11,9 @@ export default async function onMyChatMember(update) {
   if (!chat || chat.type === 'private') return; // личные чаты (блокировка бота и т. п.) нас здесь не интересуют
   const status = update.new_chat_member?.status;
   const member = update.new_chat_member ?? {};
-  // В канале бот может писать, только если он админ с правом публикации; в группе — если он участник.
-  const canPost = chat.type === 'channel'
-    ? status === 'administrator' && member.can_post_messages !== false
-    : status === 'administrator' || status === 'member';
+  // Сейфом может быть только КАНАЛ, где бот — админ с правом публикации. Группы не подходят:
+  // там есть другие участники, и копии чужих удалённых сообщений увидели бы посторонние.
+  const canPost = chat.type === 'channel' && status === 'administrator' && member.can_post_messages !== false;
 
   if (!canPost) {
     await clearVault(chat.id);

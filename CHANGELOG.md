@@ -29,6 +29,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Keeper: best quality everywhere. The largest photo size is picked by size, not by position; the Mini App loads files
   up to 20 MB in 1 MB parts and shows them unmodified; "Get as a file" sends photos and videos as uncompressed
   documents (falls back to re-sending by `file_id`).
+- Keeper launch hardening: `/terms` and `/paysupport`; owner refunds from the admin panel (cancels the subscription,
+  removes the Pro it bought) and `refunded_payment` handling; payments store kind and recipient; pre-checkout accepts
+  only the current price; a subscription keeps days already owned (`users.sub_until`); PIN attempts are counted
+  atomically with growing lockouts (`users.pin_locks`); gift lookup no longer reveals names and refuses VIP or
+  blocked users; referral prizes at most once a day; cleanup runs in batches; redelivered updates no longer
+  double-count; the safe can only be a channel. Default prices: 50 stars a month, 450 a year.
 - Keeper: bot profile set up — avatar, description, short description and command list in three languages
   (`keeper/BOTFATHER.md`, `keeper/assets/`).
 - Keeper: pin a message, photo or video to the top of a person's page (`messages.pinned`, survives retention).

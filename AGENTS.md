@@ -197,7 +197,11 @@ The platform manages the bot's webhook for you, derived from your deployed
   `sendAsFile()` in `lib/ui.js` downloads (≤ 20 MB) to re-upload a photo or video as a document. Never resize or re-encode.
 - `whoami(ctx, input)` also enforces the ban and the PIN (`input.pin`): never read user data in an endpoint before it.
 - Payments: invoice payloads are `pro` (monthly subscription), `year` (one-time, 365 days) and `gift:<userId>`;
-  `knownPayload()` in `handlers/pre_checkout_query.js` must accept every payload `invoiceLink()` can create.
+  `knownPayload()` in `handlers/pre_checkout_query.js` must accept every payload `invoiceLink()` can create, and it
+  rejects any `total_amount` other than the current price. Every payment row has `kind` and `forUser`; refunds go
+  through `markRefunded()` (admin `refund` action and `message.refunded_payment`).
+- `grantPro` keeps days owned beyond the previous subscription period (`users.sub_until`); never set `proUntil` blindly.
+- `checkPin` counts the attempt in the database before comparing; keep that order.
 - Admin = `ADMIN_IDS` (owner) or `users.role = 'admin'` (helper): check with `isAdmin(user)`; owner-only actions
   (VIP, broadcast, settings, roles) use `requireOwner`.
 - `PRO`, `REF` and `LIMITS` in `lib/config.js` are defaults: `loadSettings()` (called from `getUser`) overlays values

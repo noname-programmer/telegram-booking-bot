@@ -25,7 +25,9 @@ export async function whoami(ctx, input = {}) {
     if (result === 'wait') {
       throw new EndpointError(t(user.lang, 'pinWait', { min: Math.max(1, Math.ceil((user.pinLock - Math.floor(Date.now() / 1000)) / 60)) }), { code: 'PIN_WAIT', lang: user.lang });
     }
-    if (result === 'wrong') throw new EndpointError(t(user.lang, 'pinWrong', { left: LIMITS.pinTries - user.pinFails }), { code: 'BAD_PIN', lang: user.lang });
+    if (result === 'wrong' || result === 'last') {
+      throw new EndpointError(t(user.lang, 'pinWrong', { left: Math.max(0, LIMITS.pinTries - user.pinFails) }), { code: 'BAD_PIN', lang: user.lang });
+    }
   }
   const pro = isPro(user);
   const limit = pro ? LIMITS.proFeed : LIMITS.freeFeed;

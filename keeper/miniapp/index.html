@@ -428,6 +428,7 @@ const TEXTS = {
     idPlaceholder: 'ID пользователя', give: 'Выдать', badId: 'Введите ID цифрами',
     bcTitle: 'Рассылка', bcHint: 'Сообщение получат все, кто запускал бота.', bcPlaceholder: 'Текст сообщения', bcSend: 'Разослать всем',
     bcAsk: 'Отправить это сообщение всем пользователям ({n})?', bcDone: 'Доставлено: {s}, не доставлено: {f}', bcProgress: 'Отправляю… {s}',
+    aRefund: 'Вернуть', aRefundAsk: 'Вернуть ⭐️ {s} пользователю {id}? Pro за этот платёж будет снят, подписка отменена.', aKindPro: 'подписка', aKindYear: 'год', aKindGift: 'подарок',
     findUser: 'Поиск по имени или ID', aOwner: 'ВЛАДЕЛЕЦ', close: 'Закрыть',
     theme: 'Оформление', themes: ['Как в Telegram', 'Светлая', 'Тёмная'],
     history: 'История правок', vWas: 'Было', vNow: 'Сейчас', vStep: 'Версия {n}', oldFile: 'Показать прежний файл', oldFileChat: 'Прежний файл — в чат',
@@ -518,6 +519,7 @@ const TEXTS = {
     idPlaceholder: 'Foydalanuvchi ID', give: 'Berish', badId: 'ID ni raqamlar bilan kiriting',
     bcTitle: 'Xabar tarqatish', bcHint: 'Xabarni botni ishga tushirgan hamma oladi.', bcPlaceholder: 'Xabar matni', bcSend: 'Hammaga yuborish',
     bcAsk: 'Bu xabar barcha foydalanuvchilarga ({n}) yuborilsinmi?', bcDone: 'Yetkazildi: {s}, yetkazilmadi: {f}', bcProgress: 'Yuborilmoqda… {s}',
+    aRefund: 'Qaytarish', aRefundAsk: "{id} foydalanuvchiga ⭐️ {s} qaytarilsinmi? Bu to'lov uchun Pro olib tashlanadi, obuna bekor qilinadi.", aKindPro: 'obuna', aKindYear: 'yil', aKindGift: "sovg'a",
     findUser: "Ism yoki ID bo'yicha qidirish", aOwner: 'EGASI', close: 'Yopish',
     theme: "Ko'rinish", themes: ['Telegramdagidek', "Yorug'", "Qorong'i"],
     history: 'Tahrirlar tarixi', vWas: 'Avval', vNow: 'Hozir', vStep: '{n}-versiya', oldFile: "Avvalgi faylni ko'rsatish", oldFileChat: 'Avvalgi fayl — chatga',
@@ -608,6 +610,7 @@ const TEXTS = {
     idPlaceholder: 'User ID', give: 'Give', badId: 'Enter the ID in digits',
     bcTitle: 'Broadcast', bcHint: 'Everyone who started the bot gets the message.', bcPlaceholder: 'Message text', bcSend: 'Send to everyone',
     bcAsk: 'Send this message to all users ({n})?', bcDone: 'Delivered: {s}, not delivered: {f}', bcProgress: 'Sending… {s}',
+    aRefund: 'Refund', aRefundAsk: 'Refund ⭐️ {s} to user {id}? Pro for this payment will be removed and the subscription cancelled.', aKindPro: 'subscription', aKindYear: 'year', aKindGift: 'gift',
     findUser: 'Search by name or ID', aOwner: 'OWNER', close: 'Close',
     theme: 'Appearance', themes: ['Same as Telegram', 'Light', 'Dark'],
     history: 'Edit history', vWas: 'Before', vNow: 'Now', vStep: 'Version {n}', oldFile: 'Show the previous file', oldFileChat: 'Previous file — to chat',
@@ -1984,7 +1987,10 @@ function paintAdmin(data) {
     me.boss && h('div', { class: 'card pad' }, bcText, bcBtn, h('div', { class: 'hint', style: 'margin-top:8px' }, L.bcHint)),
     h('div', { class: 'section' }, L.aPays),
     h('div', { class: 'card' }, data.payments.length
-      ? data.payments.map((p) => h('div', { class: 'kv' }, h('span', {}, `ID ${p.userId} · ${stamp(p.at)}`), h('b', {}, `⭐️ ${num(p.stars)}`)))
+      ? data.payments.map((p) => h('div', { class: 'kv' },
+        h('span', {}, `ID ${p.userId} · ${stamp(p.at)} · ${({ pro: L.aKindPro, year: L.aKindYear, gift: L.aKindGift })[p.kind] || p.kind}`),
+        h('b', { style: p.refunded ? 'text-decoration:line-through; opacity:.55' : '' }, `⭐️ ${num(p.stars)}`),
+        me.boss && !p.refunded && h('button', { class: 'mini', style: 'margin:0 0 0 8px; color:var(--red)', onclick: () => tg.showConfirm(fill(L.aRefundAsk, { s: p.stars, id: p.userId }), (ok) => { if (ok) act({ action: 'refund', chargeId: p.chargeId }); }) }, L.aRefund)))
       : h('div', { class: 'pad hint' }, L.aNoPays)),
     h('div', { class: 'card' },
       h('div', { class: 'kv' }, h('span', {}, L.aChats), h('b', {}, num(t.chats))),

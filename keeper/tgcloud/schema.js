@@ -25,6 +25,8 @@ export const users = table('users', {
   pin:      text('pin'),                              // PIN-код на вход в приложение (хранится в зашифрованном виде)
   pinFails: integer('pin_fails').notNull().default(0),
   pinLock:  integer('pin_lock').notNull().default(0), // до какого времени ввод PIN заблокирован
+  pinLocks: integer('pin_locks').notNull().default(0), // сколько раз подряд блокировали — каждая следующая пауза вдвое длиннее
+  subUntil: integer('sub_until').notNull().default(0), // до какого времени оплачена подписка (без бонусных дней)
   vaultId:  integer('vault_id'),                      // канал-«сейф», куда бот копирует удалённые файлы
   vaultTitle: text('vault_title').notNull().default(''),
   alertClear: integer('alert_clear').notNull().default(1), // 1 — предупреждать, когда разом удалили много сообщений
@@ -152,4 +154,7 @@ export const payments = table('payments', {
   userId:   integer('user_id').notNull(),
   stars:    integer('stars').notNull(),
   at:       integer('at').notNull(),
+  kind:     text('kind').notNull().default('pro'),    // 'pro' (подписка) | 'year' | 'gift'
+  forUser:  integer('for_user'),                      // кто получил Pro (у подарка — не тот, кто платил)
+  refunded: integer('refunded').notNull().default(0), // когда звёзды вернули (0 — не возвращали)
 });
