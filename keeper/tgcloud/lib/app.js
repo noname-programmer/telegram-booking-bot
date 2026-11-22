@@ -4,12 +4,13 @@ import { api, EndpointError } from 'sdk';
 import { OWNER_ID, LIMITS, PRO, REF } from './config.js';
 import { t } from './i18n.js';
 import { getUser, isPro, isAdmin, isOwner, hasActiveConnection, countReferrals, checkPin } from './store.js';
+import { mainUsername } from './ui.js';
 
 // Имя бота (@username) нужно для ссылки-приглашения. Спрашиваем у Telegram один раз и запоминаем.
 let botName = null;
 async function botUsername() {
   if (botName === null) {
-    try { botName = (await api.getMe())?.username ?? ''; } catch { botName = ''; }
+    try { botName = mainUsername(await api.getMe()); } catch { botName = ''; }
   }
   return botName;
 }
