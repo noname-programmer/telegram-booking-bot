@@ -18,6 +18,14 @@ const quote = (s, max) => `<blockquote>${esc(cut(s, max))}</blockquote>`;
 
 export const fmtDate = (unix) => new Date(unix * 1000).toISOString().slice(0, 10);
 
+// Основное имя бота для инструкций и ссылок. С Bot API 10.4 у бота могут быть дополнительные имена
+// (например, на «agent»), и getMe может вернуть такое первым. Основное имя, выданное в @BotFather,
+// всегда заканчивается на «bot» — его и показываем, а если такого нет, берём то, что вернул Telegram.
+export function mainUsername(me) {
+  const names = [me?.username, ...(Array.isArray(me?.active_usernames) ? me.active_usernames : [])].filter(Boolean);
+  return names.find((n) => /bot$/i.test(n)) ?? names[0] ?? '';
+}
+
 // Отправляет сообщение и не падает, если пользователь заблокировал бота.
 export async function send(chatId, text, extra = {}) {
   try {

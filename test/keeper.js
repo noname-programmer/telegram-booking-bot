@@ -30,6 +30,7 @@ import promoEndpoint from '../keeper/tgcloud/endpoints/promo.js';
 import topEndpoint from '../keeper/tgcloud/endpoints/top.js';
 import onMyChatMember from '../keeper/tgcloud/handlers/my_chat_member.js';
 import { base64, utf8 } from '../keeper/tgcloud/lib/app.js';
+import { mainUsername } from '../keeper/tgcloud/lib/ui.js';
 
 // Создаём таблицы прямо из keeper/tgcloud/schema.js (на платформе это делает `npx tgcloud migrate`).
 for (const t of Object.values(schema)) {
@@ -88,6 +89,13 @@ async function step(name, fn) {
     failures.rule = null;
   }
 }
+
+await step('Основное имя бота: из нескольких имён берём то, что на «bot» (Bot API 10.4–10.5)', () => {
+  assert.equal(mainUsername({ username: 'KXSagent', active_usernames: ['KXSagent', 'keepXsavebot'] }), 'keepXsavebot');
+  assert.equal(mainUsername({ username: 'keepXsavebot' }), 'keepXsavebot');
+  assert.equal(mainUsername({ username: 'OnlyAgent', active_usernames: ['OnlyAgent'] }), 'OnlyAgent');
+  assert.equal(mainUsername(true), '');                                                              // в тестах getMe отвечает true
+});
 
 await step('Тексты есть на всех языках', () => {
   for (const lang of Object.keys(LANGS)) for (const key of KEYS) assert.ok(hasKey(lang, key), `${lang}: нет текста «${key}»`);

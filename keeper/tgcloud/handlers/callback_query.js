@@ -3,7 +3,7 @@
 import { api, BotApiError } from 'sdk';
 import { t, LANGS } from '../lib/i18n.js';
 import { getUser, setLang, setNotify, wipeUser, setPin } from '../lib/store.js';
-import { send, menu, proScreen, langKeyboard, privacyScreen, wipeConfirm, nextNotify } from '../lib/ui.js';
+import { send, menu, proScreen, langKeyboard, privacyScreen, wipeConfirm, nextNotify, mainUsername } from '../lib/ui.js';
 
 export default async function onCallback(query) {
   const chatId = query.message?.chat?.id ?? query.from.id;
@@ -26,14 +26,14 @@ export default async function onCallback(query) {
     await setLang(user.id, user.lang);
     toast = t(user.lang, 'langSet');
     const me = await api.getMe();
-    const { text, ...extra } = await menu(user, me.username);
+    const { text, ...extra } = await menu(user, mainUsername(me));
     await send(chatId, text, extra);
   } else if (data === 'notify') {
     // Режимы по кругу: тихо → коротко → сводка раз в день → полностью.
     user.notify = nextNotify(user.notify);
     await setNotify(user.id, user.notify);
     const me = await api.getMe();
-    const { text, ...extra } = await menu(user, me.username);
+    const { text, ...extra } = await menu(user, mainUsername(me));
     await send(chatId, text, extra);
   } else if (data === 'privacy') {
     const { text, ...extra } = privacyScreen(lang);

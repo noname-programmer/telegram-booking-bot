@@ -8,7 +8,7 @@ import {
   getUser, grantPro, now, stats, setReferrer, adminSetVip, isAdmin, redeemPromo, recordPayment, addProDays, paymentsOf,
   getPayment, markRefunded,
 } from '../lib/store.js';
-import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate, esc, proReminder } from '../lib/ui.js';
+import { send, menu, proScreen, langKeyboard, privacyScreen, fmtDate, esc, proReminder, mainUsername } from '../lib/ui.js';
 
 export default async function onMessage(message) {
   if (message.chat?.type !== 'private' || !message.from) return;
@@ -103,7 +103,7 @@ export default async function onMessage(message) {
 
   // /start, /help и любой другой текст — главное меню.
   const me = await api.getMe();
-  await send(chatId, ...split(await menu(user, me.username)));
+  await send(chatId, ...split(await menu(user, mainUsername(me))));
   // Если Pro заканчивается завтра — напоминаем (один раз на каждый срок). Best-effort: не роняем ответ на /start.
   try { await proReminder(user, chatId); } catch { /* напомним в следующий раз */ }
 }

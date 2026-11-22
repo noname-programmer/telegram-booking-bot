@@ -29,6 +29,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Keeper: best quality everywhere. The largest photo size is picked by size, not by position; the Mini App loads files
   up to 20 MB in 1 MB parts and shows them unmodified; "Get as a file" sends photos and videos as uncompressed
   documents (falls back to re-sending by `file_id`).
+- Keeper: Bot API 10.4–10.5 — a bot can now have secondary usernames and `getMe` may return one of them first;
+  instructions and invite links now always use the main username (the one ending in "bot").
 - Keeper launch hardening: `/terms` and `/paysupport`; owner refunds from the admin panel (cancels the subscription,
   removes the Pro it bought) and `refunded_payment` handling; payments store kind and recipient; pre-checkout accepts
   only the current price; a subscription keeps days already owned (`users.sub_until`); PIN attempts are counted
